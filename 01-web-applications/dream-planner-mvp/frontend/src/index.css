@@ -1,0 +1,340 @@
+/* stylelint-disable at-rule-no-unknown */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+/* stylelint-enable at-rule-no-unknown */
+
+:root {
+  --primary-coral: #FF6B8A;
+  --gradient-start: #FF6B8A;
+  --gradient-end: #C77DFF;
+  --success-green: #10B981;
+  --text-primary: #1F2937;
+  --text-secondary: #6B7280;
+  --background: #FAFBFC;
+}
+
+@layer base {
+  body {
+    background: var(--background);
+    color: var(--text-primary);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold;
+  }
+}
+
+@layer components {
+  /* Interactive Hover Effects */
+  .interactive-hover {
+    @apply cursor-pointer transition-all duration-200 ease-out;
+  }
+  
+  .interactive-hover:hover {
+    transform: scale(1.02);
+  }
+  
+  .interactive-hover:active {
+    transform: scale(0.98);
+    filter: brightness(0.9);
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center rounded-lg text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none interactive-hover;
+  }
+  
+  .btn-primary {
+    @apply btn text-white shadow-lg hover:shadow-xl;
+    background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
+  }
+  
+  .btn-primary:hover {
+    background: linear-gradient(to right, #FF5A7A, #B865FF);
+  }
+  
+  .btn-primary:active {
+    transform: scale(0.98);
+    filter: brightness(0.9);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  }
+  
+  .btn-secondary {
+    @apply btn bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 shadow-sm hover:shadow-md;
+  }
+  
+  .btn-secondary:active {
+    transform: scale(0.98);
+    filter: brightness(0.9);
+    background-color: #f3f4f6;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  }
+  
+  .card {
+    @apply bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden transition-all duration-200;
+  }
+  
+  .card-interactive {
+    @apply card interactive-hover hover:shadow-xl;
+  }
+  
+  .input {
+    @apply flex w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-200;
+  }
+  
+  .input:hover:not(:disabled) {
+    @apply border-blue-400 shadow-md;
+    transform: scale(1.01);
+  }
+  
+  .label {
+    @apply text-sm font-medium leading-none text-gray-700;
+  }
+
+  .dream-card {
+    @apply bg-gradient-to-br from-white to-gray-50 rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-200 interactive-hover;
+  }
+
+  .progress-bar {
+    @apply bg-gray-200 rounded-full overflow-hidden relative;
+  }
+  
+  .progress-fill {
+    @apply h-full rounded-full relative;
+    background: linear-gradient(to right, var(--success-green), var(--primary-coral));
+    transition: width 1000ms cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+  }
+
+  .progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 8px;
+    height: 100%;
+    background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.8) 0%, transparent 70%);
+    border-radius: 50%;
+    animation: progressPulse 2s ease-in-out infinite;
+    opacity: 0.9;
+  }
+
+  @keyframes progressPulse {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 0.7;
+      box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7);
+    }
+    50% {
+      transform: scale(1.2);
+      opacity: 1;
+      box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.3), 0 0 8px rgba(255, 255, 255, 0.2);
+    }
+  }
+
+  .celebration-card {
+    @apply text-white rounded-xl p-6 shadow-lg animate-fade-in;
+    background: linear-gradient(to right, var(--success-green), var(--primary-coral));
+  }
+
+  /* Animated Mesh Gradient Background */
+  .mesh-gradient-bg {
+    background: linear-gradient(
+      -45deg, 
+      #FFB5A7 0%, 
+      #FCD5CE 25%, 
+      #F8AD9D 50%, 
+      #C77DFF 75%, 
+      #FFE5B4 100%
+    );
+    background-size: 400% 400%;
+    animation: meshGradient 20s ease-in-out infinite;
+  }
+  
+  .mesh-gradient-subtle {
+    background: linear-gradient(
+      135deg,
+      #FFE5B4 0%,
+      #FFCDB2 20%,
+      #FFB3C6 40%,
+      #C77DFF 60%,
+      #FCD5CE 80%,
+      #F8AD9D 100%
+    );
+    background-size: 300% 300%;
+    animation: meshGradient 20s ease-in-out infinite;
+    opacity: 0.8;
+    /* Performance optimizations */
+    will-change: background-position, background-size;
+    backface-visibility: hidden;
+    transform: translateZ(0);
+  }
+
+  /* Keyframes for mesh gradient animation */
+  @keyframes meshGradient {
+    0% {
+      background-position: 0% 50%;
+    }
+    25% {
+      background-position: 100% 50%;
+    }
+    50% {
+      background-position: 100% 100%;
+    }
+    75% {
+      background-position: 0% 100%;
+    }
+    100% {
+      background-position: 0% 50%;
+    }
+  }
+
+  /* Keyframes for floating animation */
+  @keyframes float {
+    0%, 100% {
+      transform: translateY(0px);
+    }
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+
+  /* Floating animation classes with different durations */
+  .float-slow {
+    animation: float 3s ease-in-out infinite;
+  }
+
+  .float-medium {
+    animation: float 3.5s ease-in-out infinite;
+  }
+
+  .float-fast {
+    animation: float 4s ease-in-out infinite;
+  }
+
+  /* Keyframes for floating particles (dreams ascending) */
+  @keyframes float-up {
+    0% {
+      transform: translateY(0) translateX(0) scale(0.3);
+      opacity: 0;
+    }
+    5% {
+      opacity: 1;
+      transform: translateY(-5vh) translateX(2px) scale(1);
+    }
+    95% {
+      opacity: 0.8;
+      transform: translateY(-95vh) translateX(15px) scale(0.8);
+    }
+    100% {
+      transform: translateY(-100vh) translateX(20px) scale(0.2);
+      opacity: 0;
+    }
+  }
+
+  .animate-float-up {
+    animation-name: float-up;
+    animation-timing-function: ease-out;
+    animation-fill-mode: forwards;
+  }
+
+  /* Page Transition Animations */
+  .page-transition-enter {
+    @apply opacity-0;
+    transform: scale(0.98);
+  }
+  
+  .page-transition-enter-active {
+    @apply opacity-100;
+    transform: scale(1);
+    transition: opacity 400ms ease-out, transform 400ms ease-out;
+  }
+  
+  .page-transition-exit {
+    @apply opacity-100;
+    transform: scale(1);
+  }
+  
+  .page-transition-exit-active {
+    @apply opacity-0;
+    transform: scale(0.98);
+    transition: opacity 200ms ease-in, transform 200ms ease-in;
+  }
+
+  /* Parallax Scroll Animations */
+  .parallax-hidden {
+    opacity: 0;
+    transform: translateY(50px) scale(0.95);
+    transition: opacity 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94), 
+                transform 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+  
+  .parallax-visible {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  
+  .parallax-stagger-1 {
+    transition-delay: 0.1s;
+  }
+  
+  .parallax-stagger-2 {
+    transition-delay: 0.2s;
+  }
+  
+  .parallax-stagger-3 {
+    transition-delay: 0.3s;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  /* Hover Effect Utilities */
+  .hover-scale {
+    @apply transition-all duration-200 ease-out cursor-pointer;
+  }
+  
+  .hover-scale:hover {
+    transform: scale(1.02);
+  }
+  
+  .hover-scale:active {
+    transform: scale(0.98);
+    filter: brightness(0.9);
+  }
+  
+  .hover-lift {
+    @apply transition-all duration-200 ease-out cursor-pointer;
+  }
+  
+  .hover-lift:hover {
+    transform: translateY(-2px) scale(1.01);
+    box-shadow: 0 10px 25px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  }
+  
+  .hover-lift:active {
+    transform: translateY(0px) scale(0.98);
+    filter: brightness(0.9);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  }
+  
+  .hover-glow {
+    @apply transition-all duration-200 ease-out cursor-pointer;
+  }
+  
+  .hover-glow:hover {
+    transform: scale(1.02);
+    box-shadow: 0 0 20px rgba(255, 107, 138, 0.3);
+  }
+  
+  .hover-glow:active {
+    transform: scale(0.98);
+    filter: brightness(0.9);
+    box-shadow: 0 0 15px rgba(255, 107, 138, 0.2);
+  }
+}
