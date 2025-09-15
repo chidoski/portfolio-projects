@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { FinancialProfile, UserProfile, NorthStarDream } from '../models/FinancialProfile.js';
 
+console.log('SomedayLifeBuilder loaded successfully');
+
 const SomedayLifeBuilder = ({ onComplete, onBack }) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [financialProfile, setFinancialProfile] = useState(null);
@@ -20,6 +22,7 @@ const SomedayLifeBuilder = ({ onComplete, onBack }) => {
     selectedState: ''
   });
   const [yearsToSomeday, setYearsToSomeday] = useState(null);
+  const [calculationError, setCalculationError] = useState(null);
 
   // Lifestyle examples with realistic cost data
   const lifestyleExamples = [
@@ -93,15 +96,13 @@ const SomedayLifeBuilder = ({ onComplete, onBack }) => {
 
   // Income ranges for comfortable selection
   const incomeRanges = [
-    { value: '25000', label: 'Under $25K', midpoint: 20000 },
-    { value: '50000', label: '$25K - $50K', midpoint: 37500 },
-    { value: '75000', label: '$50K - $75K', midpoint: 62500 },
-    { value: '100000', label: '$75K - $100K', midpoint: 87500 },
-    { value: '125000', label: '$100K - $125K', midpoint: 112500 },
-    { value: '150000', label: '$125K - $150K', midpoint: 137500 },
-    { value: '200000', label: '$150K - $200K', midpoint: 175000 },
-    { value: '250000', label: '$200K - $250K', midpoint: 225000 },
-    { value: '300000', label: '$250K+', midpoint: 300000 }
+    { value: '50000', label: '$0-50k', midpoint: 25000 },
+    { value: '75000', label: '$50-75k', midpoint: 62500 },
+    { value: '100000', label: '$75-100k', midpoint: 87500 },
+    { value: '125000', label: '$100-125k', midpoint: 112500 },
+    { value: '150000', label: '$125-150k', midpoint: 137500 },
+    { value: '200000', label: '$150-200k', midpoint: 175000 },
+    { value: '250000', label: '$200k+', midpoint: 250000 }
   ];
 
   // US States for tax calculations
@@ -118,35 +119,35 @@ const SomedayLifeBuilder = ({ onComplete, onBack }) => {
 
   // Load existing data from localStorage on component mount
   useEffect(() => {
-    const savedProfile = localStorage.getItem('financialProfile');
-    if (savedProfile) {
-      try {
-        const profileData = JSON.parse(savedProfile);
-        const profile = FinancialProfile.fromJSON(profileData);
-        setFinancialProfile(profile);
-        
-        // Populate form data from saved profile
-        if (profile.northStarDream) {
-          setFormData(prev => ({
-            ...prev,
-            dreamDescription: profile.northStarDream.description || '',
-            inspirationImages: profile.northStarDream.inspirationImages || [],
-            selectedLocation: profile.northStarDream.location || '',
-            selectedHousingType: profile.northStarDream.housingType || ''
-          }));
-        }
-        
-        if (profile.userProfile) {
-          setFormData(prev => ({
-            ...prev,
-            currentAge: profile.userProfile.age || '',
-            incomeRange: profile.userProfile.income?.gross?.annual || '',
-            selectedState: profile.userProfile.location?.state || ''
-          }));
-        }
-      } catch (error) {
-        console.error('Error loading saved profile:', error);
+    try {
+      const savedProfile = localStorage.getItem('financialProfile');
+      const profileData = savedProfile ? JSON.parse(savedProfile) : null;
+      const profile = profileData ? new FinancialProfile(profileData) : new FinancialProfile();
+      setFinancialProfile(profile);
+      
+      // Populate form data from saved profile
+      if (profile.northStarDream) {
+        setFormData(prev => ({
+          ...prev,
+          dreamDescription: profile.northStarDream.description || '',
+          inspirationImages: profile.northStarDream.inspirationImages || [],
+          selectedLocation: profile.northStarDream.location || '',
+          selectedHousingType: profile.northStarDream.housingType || ''
+        }));
       }
+      
+      if (profile.userProfile) {
+        setFormData(prev => ({
+          ...prev,
+          currentAge: profile.userProfile.age || '',
+          incomeRange: profile.userProfile.income?.gross?.annual || '',
+          selectedState: profile.userProfile.location?.state || ''
+        }));
+      }
+    } catch (error) {
+      console.error('Error loading saved profile:', error);
+      // If there's an error loading, create a new profile as fallback
+      setFinancialProfile(new FinancialProfile());
     }
   }, []);
 
@@ -157,14 +158,73 @@ const SomedayLifeBuilder = ({ onComplete, onBack }) => {
     }
   }, [financialProfile]);
 
+  // Clear and initialize form fields when reaching Step 3
+  useEffect(() => {
+    if (currentStep === 3) {
+      console.log('🔄 Step 3 reached - clearing and initializing form fields...');
+      
+      // Get user's actual state from localStorage if available
+      let userActualState = '';
+      try {
+        const savedProfile = localStorage.getItem('financialProfile');
+        if (savedProfile) {
+          const profileData = JSON.parse(savedProfile);
+          userActualState = profileData.userProfile?.location?.state || '';
+        }
+      } catch (error) {
+        console.warn('⚠️ Could not retrieve user state from localStorage:', error);
+      }
+
+      console.log('🏠 Retrieved user actual state from localStorage:', userActualState);
+
+      // Clear and initialize form fields
+      setFormData(prev => ({
+        ...prev,
+        currentAge: '', // Clear age field
+        incomeRange: '', // Clear income dropdown (will show placeholder)
+        selectedState: userActualState // Set to user's actual state or empty
+      }));
+
+      console.log('✅ Form fields cleared and initialized for Step 3');
+    }
+  }, [currentStep]);
+
   // Calculate initial capacity based on basic inputs
-  const calculateInitialCapacity = () => {
-    if (!formData.currentAge || !formData.incomeRange || !formData.selectedState || !formData.selectedLifestyle) {
+  const calculateInitialCapacity = (additionalData = null) => {
+    console.log('🧮 calculateInitialCapacity called with additionalData:', additionalData);
+    
+    try {
+      if (!formData.currentAge || !formData.incomeRange || !formData.selectedState || !formData.selectedLifestyle) {
+        console.log('❌ Missing required form data for calculation');
+        return null;
+      }
+
+    const selectedIncomeRange = incomeRanges.find(range => range.value === formData.incomeRange);
+    if (!selectedIncomeRange) {
+      console.log('❌ Could not find selected income range');
       return null;
     }
 
-    const selectedIncomeRange = incomeRanges.find(range => range.value === formData.incomeRange);
-    if (!selectedIncomeRange) return null;
+    console.log('💵 Selected income range:', selectedIncomeRange);
+
+    // Get data from localStorage if available
+    const somedayDream = localStorage.getItem('somedayDream');
+    const dreamCosts = localStorage.getItem('dreamCosts');
+    
+    let parsedSomedayDream = null;
+    let parsedDreamCosts = null;
+    
+    try {
+      parsedSomedayDream = somedayDream ? JSON.parse(somedayDream) : null;
+      parsedDreamCosts = dreamCosts ? JSON.parse(dreamCosts) : null;
+    } catch (error) {
+      console.warn('⚠️ Error parsing localStorage data in calculateInitialCapacity:', error);
+    }
+
+    console.log('📦 Using localStorage data in calculation:', {
+      somedayDream: parsedSomedayDream,
+      dreamCosts: parsedDreamCosts
+    });
 
     // Create a basic financial profile for calculation
     const userProfile = new UserProfile({
@@ -177,14 +237,38 @@ const SomedayLifeBuilder = ({ onComplete, onBack }) => {
       location: { state: formData.selectedState }
     });
 
+    console.log('👤 Created user profile:', userProfile);
+
+    // Use dream costs from localStorage if available, otherwise use lifestyle data
+    let propertyCost, monthlyLivingExpenses, dreamDescription;
+    
+    if (parsedDreamCosts && parsedDreamCosts.totalCost) {
+      propertyCost = parsedDreamCosts.totalCost;
+      monthlyLivingExpenses = parsedDreamCosts.monthlyExpenses || 
+        (formData.selectedLifestyle.annualExpenses.min + formData.selectedLifestyle.annualExpenses.max) / 2 / 12;
+    } else {
+      propertyCost = (formData.selectedLifestyle.propertyCost.min + formData.selectedLifestyle.propertyCost.max) / 2;
+      monthlyLivingExpenses = (formData.selectedLifestyle.annualExpenses.min + formData.selectedLifestyle.annualExpenses.max) / 2 / 12;
+    }
+
+    if (parsedSomedayDream && parsedSomedayDream.description) {
+      dreamDescription = parsedSomedayDream.description;
+    } else {
+      dreamDescription = formData.dreamDescription;
+    }
+
+    console.log('🏠 Using dream costs:', { propertyCost, monthlyLivingExpenses });
+
     const northStarDream = new NorthStarDream({
-      description: formData.dreamDescription,
+      description: dreamDescription,
       targetAge: Math.max(parseInt(formData.currentAge) + 10, 65), // Default to at least 10 years or age 65
-      propertyCost: (formData.selectedLifestyle.propertyCost.min + formData.selectedLifestyle.propertyCost.max) / 2,
-      monthlyLivingExpenses: (formData.selectedLifestyle.annualExpenses.min + formData.selectedLifestyle.annualExpenses.max) / 2 / 12,
+      propertyCost: propertyCost,
+      monthlyLivingExpenses: monthlyLivingExpenses,
       location: formData.selectedLifestyle.location,
       housingType: formData.selectedLifestyle.housingType
     });
+
+    console.log('🌟 Created north star dream:', northStarDream);
 
     // Create basic profile with conservative expense estimates
     const profile = new FinancialProfile({
@@ -204,9 +288,17 @@ const SomedayLifeBuilder = ({ onComplete, onBack }) => {
       }
     });
 
+    console.log('📊 Created financial profile:', profile);
+
     const disposableIncome = profile.calculateDisposableIncome();
     const requiredNetWorth = northStarDream.calculateRequiredNetWorth();
     const monthlySavingsNeeded = northStarDream.calculateMonthlySavingsNeeded(0); // Assuming starting from 0
+
+    console.log('💰 Financial calculations:', {
+      disposableIncome,
+      requiredNetWorth,
+      monthlySavingsNeeded
+    });
 
     // Calculate years to goal
     let yearsToGoal = 0;
@@ -222,8 +314,20 @@ const SomedayLifeBuilder = ({ onComplete, onBack }) => {
       yearsToGoal = 25; // Default conservative estimate
     }
 
+    console.log('⏰ Calculated years to goal:', yearsToGoal);
+
     setFinancialProfile(profile);
+    
+    // Store the updated profile in localStorage as well
+    localStorage.setItem('financialProfile', JSON.stringify(profile.toJSON()));
+    console.log('💾 Updated financial profile stored in localStorage');
+    
     return yearsToGoal;
+    
+    } catch (error) {
+      console.error('❌ Error in calculateInitialCapacity:', error);
+      return null;
+    }
   };
 
   // Get estimated state tax rate (simplified)
@@ -284,8 +388,124 @@ const SomedayLifeBuilder = ({ onComplete, onBack }) => {
 
   // Handle step 3 completion
   const completeStep3 = () => {
-    const years = calculateInitialCapacity();
-    setYearsToSomeday(years);
+    console.log('🔍 Starting Calculate My Someday Timeline...');
+    
+    // Clear any previous errors
+    setCalculationError(null);
+    
+    try {
+      // 1) Collect the current age value, selected income range, and selected state
+      console.log('📊 Step 1: Collecting current form data:', {
+        currentAge: formData.currentAge,
+        incomeRange: formData.incomeRange,
+        selectedState: formData.selectedState,
+        selectedLifestyle: formData.selectedLifestyle
+      });
+      
+      // 2) Retrieve the dream data and cost estimates from localStorage
+      console.log('💾 Step 2: Retrieving data from localStorage...');
+      const somedayDream = localStorage.getItem('somedayDream');
+      const dreamCosts = localStorage.getItem('dreamCosts');
+      
+      console.log('🎯 Retrieved somedayDream from localStorage:', somedayDream);
+      console.log('💰 Retrieved dreamCosts from localStorage:', dreamCosts);
+      
+      // Validate that we have essential dream data
+      if (!formData.dreamDescription || formData.dreamDescription.trim() === '') {
+        console.log('❌ Missing dream description');
+        setCalculationError({
+          type: 'missing_dream_data',
+          message: 'We need your dream details first. Let\'s go back to complete them.',
+          actionText: 'Go to Step 1',
+          action: () => setCurrentStep(1)
+        });
+        return;
+      }
+      
+      if (!formData.selectedLifestyle) {
+        console.log('❌ Missing lifestyle selection');
+        setCalculationError({
+          type: 'missing_dream_data',
+          message: 'We need your dream details first. Let\'s go back to complete them.',
+          actionText: 'Go to Step 1',
+          action: () => setCurrentStep(1)
+        });
+        return;
+      }
+      
+      let parsedSomedayDream = null;
+      let parsedDreamCosts = null;
+      
+      try {
+        parsedSomedayDream = somedayDream ? JSON.parse(somedayDream) : null;
+        parsedDreamCosts = dreamCosts ? JSON.parse(dreamCosts) : null;
+      } catch (parseError) {
+        console.warn('⚠️ Error parsing localStorage data, continuing with form data:', parseError);
+        // Continue with form data instead of failing
+      }
+      
+      // 3) Call calculateInitialCapacity function
+      console.log('⚙️ Step 3: Calling calculateInitialCapacity with data...');
+      
+      const calculationData = {
+        currentAge: formData.currentAge,
+        incomeRange: formData.incomeRange,
+        selectedState: formData.selectedState,
+        selectedLifestyle: formData.selectedLifestyle,
+        somedayDream: parsedSomedayDream,
+        dreamCosts: parsedDreamCosts
+      };
+      
+      console.log('📋 Data being passed to calculateInitialCapacity:', calculationData);
+      
+      const years = calculateInitialCapacity();
+      
+      console.log('📈 Step 4: calculateInitialCapacity returned:', years);
+      
+      // Validate calculation result
+      if (years === null || years === undefined || isNaN(years)) {
+        console.log('❌ Calculation returned invalid result');
+        setCalculationError({
+          type: 'calculation_failed',
+          message: 'Let\'s try that again',
+          actionText: 'Retry Calculation',
+          action: () => {
+            setCalculationError(null);
+            setTimeout(() => completeStep3(), 100); // Retry after clearing error
+          }
+        });
+        return;
+      }
+      
+      // 4) Store the results in state and localStorage
+      console.log('💾 Step 5: Storing results...');
+      setYearsToSomeday(years);
+      
+      // Store calculation results in localStorage
+      const calculationResults = {
+        yearsToSomeday: years,
+        calculatedAt: new Date().toISOString(),
+        inputData: calculationData
+      };
+      
+      localStorage.setItem('somedayCalculationResults', JSON.stringify(calculationResults));
+      console.log('✅ Stored calculation results in localStorage:', calculationResults);
+      
+      // 5) Results are already revealed in the existing UI section
+      console.log('🎉 Calculation complete! Results should now be visible in the UI.');
+      
+    } catch (error) {
+      console.error('❌ Unexpected error during calculation:', error);
+      setCalculationError({
+        type: 'calculation_failed',
+        message: 'Let\'s try that again',
+        actionText: 'Retry Calculation',
+        action: () => {
+          setCalculationError(null);
+          setTimeout(() => completeStep3(), 100); // Retry after clearing error
+        }
+      });
+    }
   };
 
   // Progress indicator component
@@ -645,17 +865,75 @@ const SomedayLifeBuilder = ({ onComplete, onBack }) => {
 
             {/* Calculate Button */}
             <div className="text-center mb-8">
-              <button
-                onClick={completeStep3}
-                disabled={!formData.currentAge || !formData.incomeRange || !formData.selectedState}
-                className="px-12 py-4 bg-green-500 text-white rounded-xl font-semibold text-lg hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-              >
-                Calculate My Someday Timeline
-              </button>
+              {(() => {
+                const isFormComplete = formData.currentAge && formData.incomeRange && formData.selectedState;
+                
+                return (
+                  <>
+                    <button
+                      onClick={completeStep3}
+                      disabled={!isFormComplete}
+                      className={`
+                        px-12 py-4 rounded-xl font-semibold text-lg transition-all duration-300 transform
+                        ${isFormComplete 
+                          ? 'bg-green-500 text-white hover:bg-green-600 hover:scale-105 shadow-lg hover:shadow-xl' 
+                          : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        }
+                      `}
+                    >
+                      {isFormComplete ? '🚀 Calculate My Someday Timeline' : 'Calculate My Someday Timeline'}
+                    </button>
+                    
+                    {/* Helper text */}
+                    <div className="mt-3 h-6">
+                      {!isFormComplete && (
+                        <p className="text-sm text-gray-500 animate-pulse">
+                          Please fill all fields to continue
+                        </p>
+                      )}
+                      {isFormComplete && (
+                        <p className="text-sm text-green-600 font-medium">
+                          Ready to calculate your timeline! ✨
+                        </p>
+                      )}
+                    </div>
+                  </>
+                );
+              })()}
             </div>
 
+            {/* Error Messages */}
+            {calculationError && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-6 mb-8 text-center">
+                <div className="flex items-center justify-center mb-4">
+                  <div className="bg-red-100 rounded-full p-3">
+                    <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                    </svg>
+                  </div>
+                </div>
+                
+                <h4 className="text-lg font-semibold text-red-800 mb-3">
+                  {calculationError.message}
+                </h4>
+                
+                <button
+                  onClick={calculationError.action}
+                  className="px-6 py-3 bg-red-600 text-white rounded-xl font-semibold hover:bg-red-700 transition-colors"
+                >
+                  {calculationError.actionText}
+                </button>
+                
+                {calculationError.type === 'calculation_failed' && (
+                  <p className="text-sm text-red-600 mt-3">
+                    Don't worry - this sometimes happens. We'll get it working!
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* Results */}
-            {yearsToSomeday !== null && (
+            {yearsToSomeday !== null && !calculationError && (
               <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-xl p-8 text-center">
                 <h4 className="text-2xl font-bold text-gray-800 mb-4">
                   Your Preliminary Timeline

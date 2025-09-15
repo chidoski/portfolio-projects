@@ -16,6 +16,12 @@ import SomedayLifeBuilder from './pages/SomedayLifeBuilder'
 import ZeroBasedPlanner from './pages/ZeroBasedPlanner'
 // @ts-ignore - SpendingDecisionDemo.jsx doesn't have TypeScript declarations
 import SpendingDecisionDemo from './components/SpendingDecisionDemo'
+// @ts-ignore - IncomeAccelerator.jsx doesn't have TypeScript declarations
+import IncomeAccelerator from './pages/IncomeAccelerator'
+// @ts-ignore - ErrorBoundary.jsx doesn't have TypeScript declarations
+import ErrorBoundary from './components/ErrorBoundary'
+// @ts-ignore - ErrorBoundaryTest.jsx doesn't have TypeScript declarations
+import ErrorBoundaryTest from './components/ErrorBoundaryTest'
 import PageTransition from './components/PageTransition'
 import FloatingParticles from './components/FloatingParticles'
 import { useIntersectionObserver } from './utils/useIntersectionObserver'
@@ -23,7 +29,7 @@ import { useCountUp } from './utils/useCountUp'
 // @ts-ignore - demoData.js doesn't have TypeScript declarations
 import { getDemoUser } from './services/demoData'
 
-type View = 'welcome' | 'builder' | 'calculator' | 'dashboard' | 'quickstart' | 'dreamcreator' | 'financialwizard' | 'somedaybuilder' | 'zerobasedplanner' | 'spendingdemo'
+type View = 'welcome' | 'builder' | 'calculator' | 'dashboard' | 'quickstart' | 'dreamcreator' | 'financialwizard' | 'somedaybuilder' | 'zerobasedplanner' | 'spendingdemo' | 'incomeaccelerator' | 'errortest'
 
 interface TemplateData {
   title: string
@@ -74,6 +80,10 @@ function App() {
         setCurrentView('zerobasedplanner')
       } else if (path === '/spending-demo') {
         setCurrentView('spendingdemo')
+      } else if (path === '/income-accelerator') {
+        setCurrentView('incomeaccelerator')
+      } else if (path === '/error-test' && process.env.NODE_ENV === 'development') {
+        setCurrentView('errortest')
       } else {
         setCurrentView('welcome')
       }
@@ -201,6 +211,9 @@ function App() {
       case 'spendingdemo':
         path = '/spending-demo'
         break
+      case 'incomeaccelerator':
+        path = '/income-accelerator'
+        break
       default:
         path = '/'
     }
@@ -273,6 +286,10 @@ function App() {
         />
       case 'spendingdemo':
         return <SpendingDecisionDemo />
+      case 'incomeaccelerator':
+        return <IncomeAccelerator />
+      case 'errortest':
+        return process.env.NODE_ENV === 'development' ? <ErrorBoundaryTest /> : null
       default:
         return <WelcomeScreen 
           onGetStarted={() => navigateTo('builder')} 
@@ -280,25 +297,28 @@ function App() {
           onQuickStart={() => navigateTo('quickstart')}
           onSomedayBuilder={() => navigateTo('somedaybuilder')}
           onSpendingDemo={() => navigateTo('spendingdemo')}
+          onIncomeAccelerator={() => navigateTo('incomeaccelerator')}
         />
     }
   }
 
   return (
-    <div className="min-h-screen mesh-gradient-subtle">
-      {/* Demo Mode Indicator */}
-      {isDemoMode && (
-        <div className="fixed top-4 right-4 z-50 bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 py-2 rounded-full shadow-lg flex items-center space-x-2 animate-pulse">
-          <Eye className="w-4 h-4" />
-          <span className="text-sm font-medium">Demo Mode</span>
-          <div className="w-2 h-2 bg-white rounded-full animate-ping"></div>
-        </div>
-      )}
-      
-      <PageTransition transitionKey={currentView}>
-        {renderView()}
-      </PageTransition>
-    </div>
+    <ErrorBoundary>
+      <div className="min-h-screen mesh-gradient-subtle">
+        {/* Demo Mode Indicator */}
+        {isDemoMode && (
+          <div className="fixed top-4 right-4 z-50 bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 py-2 rounded-full shadow-lg flex items-center space-x-2 animate-pulse">
+            <Eye className="w-4 h-4" />
+            <span className="text-sm font-medium">Demo Mode</span>
+            <div className="w-2 h-2 bg-white rounded-full animate-ping"></div>
+          </div>
+        )}
+        
+        <PageTransition transitionKey={currentView}>
+          {renderView()}
+        </PageTransition>
+      </div>
+    </ErrorBoundary>
   )
 }
 
@@ -308,9 +328,10 @@ interface WelcomeScreenProps {
   onQuickStart: () => void
   onSomedayBuilder: () => void
   onSpendingDemo: () => void
+  onIncomeAccelerator: () => void
 }
 
-function WelcomeScreen({ onGetStarted, onTryCalculator, onQuickStart, onSomedayBuilder, onSpendingDemo }: WelcomeScreenProps) {
+function WelcomeScreen({ onGetStarted, onTryCalculator, onQuickStart, onSomedayBuilder, onSpendingDemo, onIncomeAccelerator }: WelcomeScreenProps) {
   const dreamEquivalents = [
     '$50,000 vacation = Skip one coffee daily',
     '$30,000 car = One less streaming service', 
@@ -458,6 +479,13 @@ function WelcomeScreen({ onGetStarted, onTryCalculator, onQuickStart, onSomedayB
             className="btn-secondary px-8 py-3 text-lg w-full sm:w-auto"
           >
             Spending Decision Demo
+          </button>
+          
+          <button
+            onClick={onIncomeAccelerator}
+            className="btn-secondary px-8 py-3 text-lg w-full sm:w-auto"
+          >
+            💰 Income Accelerator
           </button>
         </div>
 

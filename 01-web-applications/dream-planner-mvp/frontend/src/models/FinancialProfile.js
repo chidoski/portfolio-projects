@@ -208,10 +208,34 @@ export class Debt {
       return Math.ceil(this.currentBalance / this.monthlyPayment);
     }
     
-    // Calculate using amortization formula
-    const numerator = Math.log(1 + (this.currentBalance * monthlyInterestRate) / this.monthlyPayment);
+    // Check if payment covers interest (prevents infinite payoff)
+    const monthlyInterest = this.currentBalance * monthlyInterestRate;
+    if (this.monthlyPayment <= monthlyInterest) {
+      console.warn(`Payment ${this.monthlyPayment} does not cover monthly interest ${monthlyInterest.toFixed(2)} for debt: ${this.name}`);
+      return 999; // Return high number to indicate problem
+    }
+    
+    // Calculate using correct amortization formula: n = -ln(1 - (P*r)/M) / ln(1 + r)
+    // This is mathematically equivalent but more numerically stable
+    const ratio = (this.currentBalance * monthlyInterestRate) / this.monthlyPayment;
+    const numerator = -Math.log(1 - ratio);
     const denominator = Math.log(1 + monthlyInterestRate);
-    return Math.ceil(numerator / denominator);
+    
+    const months = numerator / denominator;
+    
+    // Debug logging for federal loans
+    if (this.type === 'student_loan' && this.currentBalance > 50000) {
+      console.log(`Federal loan calculation for ${this.name}:`);
+      console.log(`- Balance: $${this.currentBalance}`);
+      console.log(`- Payment: $${this.monthlyPayment}`);
+      console.log(`- Rate: ${this.interestRate}%`);
+      console.log(`- Monthly rate: ${(monthlyInterestRate * 100).toFixed(4)}%`);
+      console.log(`- Monthly interest: $${monthlyInterest.toFixed(2)}`);
+      console.log(`- Ratio: ${ratio.toFixed(6)}`);
+      console.log(`- Calculated months: ${months.toFixed(2)}`);
+    }
+    
+    return Math.ceil(months);
   }
 
   calculatePayoffDate() {
@@ -223,7 +247,54 @@ export class Debt {
 
   calculateTotalInterest() {
     const remainingMonths = this.calculateRemainingMonths();
-    return Math.max(0, (this.monthlyPayment * remainingMonths) - this.currentBalance);
+    if (remainingMonths >= 999) return 0; // Invalid calculation
+    
+    // For more accurate interest calculation, especially for federal loans
+    if (this.interestRate === 0) {
+      return 0;
+    }
+    
+    // Simple approximation: total payments minus principal
+    const totalPayments = this.monthlyPayment * remainingMonths;
+    const totalInterest = totalPayments - this.currentBalance;
+    
+    // For federal loans, do a more detailed calculation if needed
+    if (this.type === 'student_loan' && this.currentBalance > 10000) {
+      const detailedInterest = this.calculateDetailedInterest();
+      if (Math.abs(detailedInterest - totalInterest) > totalInterest * 0.1) {
+        console.log(`Using detailed interest calculation for ${this.name}: $${detailedInterest.toFixed(2)} vs simple $${totalInterest.toFixed(2)}`);
+        return Math.max(0, Math.round(detailedInterest));
+      }
+    }
+    
+    return Math.max(0, Math.round(totalInterest));
+  }
+  
+  calculateDetailedInterest() {
+    // Month-by-month simulation for accurate interest calculation
+    let balance = this.currentBalance;
+    let totalInterest = 0;
+    let month = 0;
+    const monthlyRate = this.interestRate / 100 / 12;
+    const maxMonths = 600; // 50 year safety limit
+    
+    while (balance > 0.01 && month < maxMonths) {
+      month++;
+      const interestPayment = balance * monthlyRate;
+      let principalPayment = this.monthlyPayment - interestPayment;
+      
+      // Don't overpay principal
+      if (principalPayment > balance) {
+        principalPayment = balance;
+      }
+      
+      balance -= principalPayment;
+      totalInterest += interestPayment;
+      
+      if (balance <= 0.01) break;
+    }
+    
+    return totalInterest;
   }
 
   getDebtUtilizationRatio(creditLimit = null) {
@@ -715,30 +786,43 @@ export class FinancialProfile {
     let currentMonth = 0;
     let remainingExtraPayment = extraPayment;
 
-    // Create working copies of debts
+    // Create working copies of debts with original total interest calculation
     const workingDebts = sortedDebts.map(debt => ({
       ...debt,
-      remainingBalance: debt.currentBalance
+      remainingBalance: debt.currentBalance,
+      originalTotalInterest: debt.calculateTotalInterest() // Calculate this before losing methods
     }));
 
+    let previousTotalBalance = 0;
+    let noProgressCount = 0;
+    
     while (workingDebts.some(debt => debt.remainingBalance > 0)) {
       currentMonth++;
       let monthlyInterest = 0;
+      
+      // Track total balance to detect if we're making progress
+      const currentTotalBalance = workingDebts.reduce((sum, debt) => sum + debt.remainingBalance, 0);
       
       // Apply minimum payments to all debts
       workingDebts.forEach(debt => {
         if (debt.remainingBalance > 0) {
           const monthlyInterestRate = debt.interestRate / 100 / 12;
           const interestPayment = debt.remainingBalance * monthlyInterestRate;
-          const principalPayment = Math.min(
+          
+          // Calculate principal payment, ensuring it's at least a small positive amount
+          // to prevent infinite loops when payment < interest
+          let principalPayment = Math.max(
             debt.monthlyPayment - interestPayment,
-            debt.remainingBalance
+            0.01 // Minimum $0.01 principal payment to ensure progress
           );
+          
+          // Don't pay more than the remaining balance
+          principalPayment = Math.min(principalPayment, debt.remainingBalance);
           
           debt.remainingBalance -= principalPayment;
           monthlyInterest += interestPayment;
           
-          if (debt.remainingBalance < 0) debt.remainingBalance = 0;
+          if (debt.remainingBalance < 0.01) debt.remainingBalance = 0; // Round to zero if very small
         }
       });
 
@@ -761,11 +845,25 @@ export class FinancialProfile {
             debtName: debt.name,
             month: currentMonth,
             originalBalance: debt.currentBalance,
-            totalInterestPaid: debt.calculateTotalInterest()
+            totalInterestPaid: debt.originalTotalInterest
           });
         }
       });
 
+      // Check if we're making progress (balance should decrease each month)
+      if (Math.abs(currentTotalBalance - previousTotalBalance) < 0.01) {
+        noProgressCount++;
+        if (noProgressCount > 3) {
+          // If no progress for 3 months, force progress or break
+          console.warn('No progress detected in debt payoff calculation. Breaking to prevent infinite loop.');
+          break;
+        }
+      } else {
+        noProgressCount = 0; // Reset counter if progress was made
+      }
+      
+      previousTotalBalance = currentTotalBalance;
+      
       // Safety check to prevent infinite loops
       if (currentMonth > 600) break; // 50 years max
     }
