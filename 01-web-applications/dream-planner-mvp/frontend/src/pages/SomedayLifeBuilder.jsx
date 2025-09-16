@@ -18,6 +18,7 @@ const SomedayLifeBuilder = ({ onComplete, onBack }) => {
     inspirationImages: [],
     selectedLocation: '',
     selectedHousingType: '',
+    selectedArchetype: '', // New field for lifestyle archetype
     
     // Step 2: Lifestyle Selection (now includes annual spending)
     selectedLifestyle: null,
@@ -58,13 +59,18 @@ const SomedayLifeBuilder = ({ onComplete, onBack }) => {
   const [hoveredTemplate, setHoveredTemplate] = useState(null);
   const [showNearTermGoalMessage, setShowNearTermGoalMessage] = useState(false);
   const [selectedNearTermTemplate, setSelectedNearTermTemplate] = useState(null);
-  const [useIncomeRange, setUseIncomeRange] = useState(false);
+  const [useIncomeRange, setUseIncomeRange] = useState(false); // Default to exact input mode
   const [preliminaryInsight, setPreliminaryInsight] = useState(null);
   const [calculationStage, setCalculationStage] = useState('ready'); // 'ready', 'analyzing', 'comparing', 'optimizing', 'complete'
   const [seasonalView, setSeasonalView] = useState({}); // Track season view for each lifestyle
   const [selectedForComparison, setSelectedForComparison] = useState([]); // Track items selected for comparison
   const [showComparison, setShowComparison] = useState(false);
   const [expandedLifestyle, setExpandedLifestyle] = useState(null); // Track which lifestyle is expanded for details
+  const [dreamAnalysis, setDreamAnalysis] = useState(null); // Store AI dream interpretation
+  const [showAnalysisModal, setShowAnalysisModal] = useState(false); // Control analysis modal display
+  const [analysisLoading, setAnalysisLoading] = useState(false); // Track analysis loading state
+  const [detectedThemes, setDetectedThemes] = useState([]); // Store detected themes from dream analysis
+  const [isNavigating, setIsNavigating] = useState(false); // Track navigation loading state
 
   // Lifestyle examples with specific locations and realistic cost data
   const lifestyleExamples = [
@@ -493,6 +499,1100 @@ const SomedayLifeBuilder = ({ onComplete, onBack }) => {
     return adjusted;
   };
 
+  // New archetype-based cost calculation function
+  const calculateLifestyleCosts = (archetype, preferences, userState = '') => {
+    console.log('🏛️ Calculating lifestyle costs for archetype:', archetype);
+    
+    const baseCosts = {
+      propertyCost: 0,
+      annualCosts: 0,
+      costStructure: 'unknown'
+    };
+
+    switch (archetype) {
+      case 'rooted-living':
+        return calculateRootedLivingCosts(preferences, userState);
+      
+      case 'nomadic-freedom':
+        return calculateNomadicCosts(preferences, userState);
+      
+      case 'purpose-driven':
+        return calculatePurposeDrivenCosts(preferences, userState);
+      
+      case 'multi-base':
+        return calculateMultiBaseCosts(preferences, userState);
+      
+      case 'community-centered':
+        return calculateCommunityCenteredCosts(preferences, userState);
+      
+      default:
+        return baseCosts;
+    }
+  };
+
+  // Rooted Living: Traditional property + annual living costs
+  const calculateRootedLivingCosts = (preferences, userState) => {
+    const locationPricing = {
+      'small-town': { property: [180000, 320000], annual: 45000 },
+      'suburban': { property: [250000, 450000], annual: 55000 },
+      'rural': { property: [150000, 280000], annual: 40000 },
+      'coastal': { property: [350000, 600000], annual: 65000 },
+      'mountain': { property: [220000, 400000], annual: 50000 },
+      'city-neighborhood': { property: [300000, 550000], annual: 70000 }
+    };
+
+    const housingPricing = {
+      'single-family': 1.0,
+      'cottage': 0.8,
+      'farmhouse': 1.2,
+      'historic': 1.3,
+      'custom-built': 1.5,
+      'condo-community': 0.7
+    };
+
+    const location = preferences.rootedLocation || 'suburban';
+    const housing = preferences.rootedHousing || 'single-family';
+    
+    const baseProperty = locationPricing[location] || locationPricing['suburban'];
+    const housingMultiplier = housingPricing[housing] || 1.0;
+    
+    const propertyCost = [
+      Math.round(baseProperty.property[0] * housingMultiplier),
+      Math.round(baseProperty.property[1] * housingMultiplier)
+    ];
+    
+    // Apply state cost adjustments
+    const stateCostMultiplier = getStateCostMultiplier(userState);
+    
+    return {
+      propertyCost: {
+        min: Math.round(propertyCost[0] * stateCostMultiplier),
+        max: Math.round(propertyCost[1] * stateCostMultiplier)
+      },
+      annualCosts: Math.round(baseProperty.annual * housingMultiplier * stateCostMultiplier),
+      costStructure: 'property-plus-annual',
+      description: `${housing} in ${location} area`
+    };
+  };
+
+  // Nomadic Freedom: Annual travel budget, no property costs
+  const calculateNomadicCosts = (preferences, userState) => {
+    const travelBudgets = {
+      '30000': { annual: 35000, description: 'Budget-conscious nomad lifestyle' },
+      '60000': { annual: 65000, description: 'Comfortable explorer lifestyle' },
+      '100000': { annual: 105000, description: 'Luxury traveler lifestyle' },
+      '150000': { annual: 160000, description: 'Premium experiences lifestyle' }
+    };
+
+    const regionMultipliers = {
+      'domestic-us': 0.8,
+      'north-america': 0.9,
+      'europe': 1.2,
+      'asia-pacific': 1.0,
+      'latin-america': 0.7,
+      'worldwide': 1.4,
+      'warm-climates': 0.9,
+      'cultural-centers': 1.1
+    };
+
+    const paceMultipliers = {
+      'slow-travel': 0.8,
+      'medium-travel': 1.0,
+      'constant-movement': 1.3,
+      'seasonal-bases': 0.9,
+      'flexible-spontaneous': 1.1,
+      'structured-itinerary': 1.0
+    };
+
+    const budget = preferences.travelBudget || '60000';
+    const regions = preferences.preferredRegions || 'domestic-us';
+    const pace = preferences.travelPace || 'medium-travel';
+    
+    const baseBudget = travelBudgets[budget] || travelBudgets['60000'];
+    const regionMultiplier = regionMultipliers[regions] || 1.0;
+    const paceMultiplier = paceMultipliers[pace] || 1.0;
+    
+    const finalCost = Math.round(baseBudget.annual * regionMultiplier * paceMultiplier);
+    
+    return {
+      propertyCost: { min: 0, max: 0 }, // No property needed
+      annualCosts: finalCost,
+      costStructure: 'annual-only',
+      description: `${pace.replace('-', ' ')} in ${regions.replace('-', ' ')} regions`,
+      specialNote: 'No property purchase required - funding your experiences directly'
+    };
+  };
+
+  // Purpose-Driven: Mission costs + basic living
+  const calculatePurposeDrivenCosts = (preferences, userState) => {
+    const missionCosts = {
+      'education': { setup: 25000, annual: 15000 },
+      'environmental': { setup: 30000, annual: 20000 },
+      'social-justice': { setup: 15000, annual: 12000 },
+      'health-wellness': { setup: 40000, annual: 25000 },
+      'arts-culture': { setup: 20000, annual: 18000 },
+      'community-development': { setup: 35000, annual: 22000 },
+      'entrepreneurship': { setup: 50000, annual: 30000 },
+      'spiritual': { setup: 10000, annual: 8000 },
+      'youth-development': { setup: 20000, annual: 16000 },
+      'senior-care': { setup: 35000, annual: 24000 },
+      'poverty-relief': { setup: 25000, annual: 18000 },
+      'disaster-relief': { setup: 45000, annual: 28000 }
+    };
+
+    const commitmentMultipliers = {
+      'full-time': 1.0,
+      'part-time-high': 0.8,
+      'part-time-moderate': 0.6,
+      'project-based': 0.7,
+      'seasonal': 0.5,
+      'volunteer-regular': 0.4,
+      'volunteer-flexible': 0.3,
+      'advisory-board': 0.2
+    };
+
+    const impact = preferences.areaOfImpact || preferences.purposeMission || 'community-development';
+    const commitment = preferences.timeCommitment || 'part-time-moderate';
+    
+    const missionData = missionCosts[impact] || missionCosts['community-development'];
+    const commitmentMultiplier = commitmentMultipliers[commitment] || 0.6;
+    
+    const baseLivingCosts = 45000; // Modest living to focus on mission
+    const stateCostMultiplier = getStateCostMultiplier(userState);
+    
+    const adjustedSetup = Math.round(missionData.setup * commitmentMultiplier);
+    const adjustedAnnual = Math.round(missionData.annual * commitmentMultiplier);
+    
+    return {
+      propertyCost: { 
+        min: Math.round(adjustedSetup * 0.8 * stateCostMultiplier), 
+        max: Math.round(adjustedSetup * 1.2 * stateCostMultiplier) 
+      },
+      annualCosts: Math.round((baseLivingCosts + adjustedAnnual) * stateCostMultiplier),
+      costStructure: 'mission-plus-living',
+      description: `${commitment.replace('-', ' ')} ${impact.replace('-', ' ')} mission`,
+      specialNote: 'Includes startup costs for your mission and ongoing operational expenses'
+    };
+  };
+
+  // Multi-Base: Multiple properties or seasonal rentals
+  const calculateMultiBaseCosts = (preferences, userState) => {
+    const baseCount = parseInt(preferences.multiBaseCount) || 2;
+    const reason = preferences.multiBaseReason || 'climate';
+    const locationType = preferences.multiBaseLocations || 'warm-cold';
+    
+    const strategyPricing = {
+      'climate': { propertyMultiplier: 0.7, rentalAnnual: 35000 },
+      'family': { propertyMultiplier: 0.8, rentalAnnual: 25000 },
+      'activities': { propertyMultiplier: 0.9, rentalAnnual: 40000 },
+      'investment': { propertyMultiplier: 1.2, rentalAnnual: 20000 },
+      'work': { propertyMultiplier: 1.0, rentalAnnual: 45000 },
+      'adventure': { propertyMultiplier: 0.6, rentalAnnual: 50000 }
+    };
+
+    const locationMultipliers = {
+      'warm-cold': 1.0,
+      'urban-rural': 1.1,
+      'coast-mountains': 1.2,
+      'domestic-international': 1.4,
+      'family-adventure': 0.9,
+      'different-regions': 1.0,
+      'investment-lifestyle': 1.3
+    };
+
+    const strategy = strategyPricing[reason] || strategyPricing['climate'];
+    const locationMultiplier = locationMultipliers[locationType] || 1.0;
+    const basePropertyCost = 280000;
+    const stateCostMultiplier = getStateCostMultiplier(userState);
+    
+    // Strategy: Mix of owned and rented based on count
+    const ownedProperties = Math.min(baseCount, 2);
+    const rentalBases = Math.max(0, baseCount - 2);
+    
+    const totalPropertyCost = ownedProperties * basePropertyCost * strategy.propertyMultiplier * locationMultiplier;
+    const annualRentalCosts = rentalBases * strategy.rentalAnnual * locationMultiplier;
+    const baseLivingCosts = 40000;
+    
+    return {
+      propertyCost: {
+        min: Math.round(totalPropertyCost * 0.8 * stateCostMultiplier),
+        max: Math.round(totalPropertyCost * 1.2 * stateCostMultiplier)
+      },
+      annualCosts: Math.round((baseLivingCosts + annualRentalCosts) * stateCostMultiplier),
+      costStructure: 'multi-base',
+      description: `${baseCount} ${locationType.replace('-', ' ')} bases for ${reason}`,
+      specialNote: `Includes ${ownedProperties} owned properties and ${rentalBases} seasonal arrangements`
+    };
+  };
+
+  // Community-Centered: Community-specific costs
+  const calculateCommunityCenteredCosts = (preferences, userState) => {
+    const communityPricing = {
+      'family-proximity': { property: [220000, 380000], annual: 50000 },
+      'senior-community': { property: [180000, 320000], annual: 60000 },
+      'shared-interests': { property: [200000, 350000], annual: 45000 },
+      'multi-generational': { property: [300000, 500000], annual: 55000 },
+      'co-housing': { property: [160000, 280000], annual: 40000 },
+      'cultural': { property: [240000, 400000], annual: 52000 }
+    };
+
+    const communityType = preferences.communityType || 'senior-community';
+    const pricing = communityPricing[communityType] || communityPricing['senior-community'];
+    const stateCostMultiplier = getStateCostMultiplier(userState);
+    
+    return {
+      propertyCost: {
+        min: Math.round(pricing.property[0] * stateCostMultiplier),
+        max: Math.round(pricing.property[1] * stateCostMultiplier)
+      },
+      annualCosts: Math.round(pricing.annual * stateCostMultiplier),
+      costStructure: 'community-based',
+      description: `${communityType} community living`,
+      specialNote: 'Includes community fees and shared amenities'
+    };
+  };
+
+  // Helper function to get state cost multiplier
+  const getStateCostMultiplier = (state) => {
+    const stateCostMultipliers = {
+      'California': 1.3,
+      'New York': 1.25,
+      'Massachusetts': 1.2,
+      'Connecticut': 1.18,
+      'New Jersey': 1.15,
+      'Maryland': 1.1,
+      'Washington': 1.08,
+      'Colorado': 1.05,
+      'Vermont': 1.02,
+      'Maine': 1.0,
+      'North Carolina': 0.95,
+      'Arizona': 0.98,
+      'Oregon': 1.03,
+      'Georgia': 0.92,
+      'Texas': 0.95,
+      'Florida': 0.96,
+      'Tennessee': 0.90,
+      'Ohio': 0.88,
+      'Michigan': 0.87,
+      'Indiana': 0.85
+    };
+    
+    return stateCostMultipliers[state] || 1.0;
+  };
+
+  // Dynamic Form Field Renderer Component
+  const DynamicFormField = ({ question, value, onChange, hasError = false }) => {
+    const commonClasses = `w-full p-3 border rounded-lg focus:outline-none transition-all duration-200 ${
+      hasError 
+        ? 'border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-200' 
+        : 'border-gray-300 focus:border-blue-500'
+    }`;
+    
+    return (
+      <div className="space-y-2 animate-fade-in">
+        <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+          <span className="text-lg">{question.icon}</span>
+          {question.label}
+        </label>
+        
+        {question.type === 'select' && (
+          <select
+            value={value || ''}
+            onChange={(e) => onChange(question.id, e.target.value)}
+            className={commonClasses}
+          >
+            <option value="">{question.placeholder}</option>
+            {question.options.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        )}
+        
+        {question.type === 'textarea' && (
+          <textarea
+            value={value || ''}
+            onChange={(e) => onChange(question.id, e.target.value)}
+            rows={question.rows || 3}
+            className={`${commonClasses} resize-none`}
+            placeholder={question.placeholder}
+          />
+        )}
+        
+        {question.type === 'text' && (
+          <input
+            type="text"
+            value={value || ''}
+            onChange={(e) => onChange(question.id, e.target.value)}
+            className={commonClasses}
+            placeholder={question.placeholder}
+          />
+        )}
+      </div>
+    );
+  };
+
+  // Dynamic Form Fields Generator
+  const getArchetypeQuestions = (archetype) => {
+    if (!archetype) return [];
+
+    const questionConfigs = {
+      'rooted-living': [
+        {
+          id: 'rootedLocation',
+          type: 'select',
+          label: 'What type of location appeals to you most?',
+          placeholder: 'Choose a location type...',
+          options: [
+            { value: 'small-town', label: 'Small town with character' },
+            { value: 'suburban', label: 'Established suburban neighborhood' },
+            { value: 'rural', label: 'Rural area with land' },
+            { value: 'coastal', label: 'Coastal community' },
+            { value: 'mountain', label: 'Mountain town' },
+            { value: 'city-neighborhood', label: 'Urban neighborhood with community feel' }
+          ],
+          icon: '🏡'
+        },
+        {
+          id: 'rootedHousing',
+          type: 'select',
+          label: 'What type of home would make you feel most rooted?',
+          placeholder: 'Choose a housing type...',
+          options: [
+            { value: 'single-family', label: 'Single-family home with yard' },
+            { value: 'cottage', label: 'Charming cottage or bungalow' },
+            { value: 'farmhouse', label: 'Farmhouse with acreage' },
+            { value: 'historic', label: 'Historic home with character' },
+            { value: 'custom-built', label: 'Custom-built dream home' },
+            { value: 'condo-community', label: 'Condo in established community' }
+          ],
+          icon: '🏠'
+        }
+      ],
+
+      'nomadic-freedom': [
+        {
+          id: 'travelStyle',
+          type: 'select',
+          label: 'What\'s your preferred travel style?',
+          placeholder: 'Choose your travel style...',
+          options: [
+            { value: 'luxury', label: 'Luxury - Premium accommodations and experiences' },
+            { value: 'comfortable', label: 'Comfortable - Quality accommodations, good amenities' },
+            { value: 'budget', label: 'Budget-conscious - Affordable options, local experiences' },
+            { value: 'mixed', label: 'Mixed - Splurge sometimes, save others' }
+          ],
+          icon: '✈️'
+        },
+        {
+          id: 'baseNeeds',
+          type: 'select',
+          label: 'What base infrastructure do you need?',
+          placeholder: 'Choose your base needs...',
+          options: [
+            { value: 'family-home', label: 'Family home - Keep a primary residence for family' },
+            { value: 'storage-only', label: 'Storage only - Just need space for belongings' },
+            { value: 'fully-nomadic', label: 'Fully nomadic - Travel with everything I need' },
+            { value: 'seasonal-base', label: 'Seasonal base - One home for off-season returns' }
+          ],
+          icon: '🎒'
+        },
+        {
+          id: 'travelPace',
+          type: 'select',
+          label: 'What\'s your ideal travel pace?',
+          placeholder: 'Choose your travel pace...',
+          options: [
+            { value: 'slow-travel', label: 'Slow travel (1-6 months per location)' },
+            { value: 'medium-travel', label: 'Medium pace (2-8 weeks per location)' },
+            { value: 'constant-movement', label: 'Constant movement (1-4 weeks per location)' },
+            { value: 'seasonal-bases', label: 'Seasonal bases (3-6 months per location)' }
+          ],
+          icon: '🌍'
+        }
+      ],
+
+      'purpose-driven': [
+        {
+          id: 'areaOfImpact',
+          type: 'select',
+          label: 'What area of impact calls to you most?',
+          placeholder: 'Choose your area of impact...',
+          options: [
+            { value: 'education', label: 'Education and literacy' },
+            { value: 'environmental', label: 'Environmental conservation' },
+            { value: 'social-justice', label: 'Social justice and human rights' },
+            { value: 'health-wellness', label: 'Health and wellness' },
+            { value: 'arts-culture', label: 'Arts, culture, and creative expression' },
+            { value: 'community-development', label: 'Community development' },
+            { value: 'entrepreneurship', label: 'Social entrepreneurship' },
+            { value: 'youth-development', label: 'Youth development and mentoring' }
+          ],
+          icon: '🌟'
+        },
+        {
+          id: 'geographicFlexibility',
+          type: 'select',
+          label: 'How flexible are you with location?',
+          placeholder: 'Choose your geographic flexibility...',
+          options: [
+            { value: 'one-location', label: 'One location - Deep roots in one community' },
+            { value: 'regional', label: 'Regional - Within a specific area or state' },
+            { value: 'national', label: 'National - Anywhere in the country' },
+            { value: 'global', label: 'Global - International impact opportunities' }
+          ],
+          icon: '🗺️'
+        },
+        {
+          id: 'timeCommitment',
+          type: 'select',
+          label: 'What\'s your ideal time commitment level?',
+          placeholder: 'Choose your commitment level...',
+          options: [
+            { value: 'full-time', label: 'Full-time dedication (40+ hours/week)' },
+            { value: 'part-time-high', label: 'High part-time (20-35 hours/week)' },
+            { value: 'part-time-moderate', label: 'Moderate part-time (10-20 hours/week)' },
+            { value: 'project-based', label: 'Project-based involvement' },
+            { value: 'volunteer-regular', label: 'Regular volunteer schedule (5-15 hours/week)' }
+          ],
+          icon: '⏰'
+        }
+      ],
+
+      'multi-base': [
+        {
+          id: 'multiBaseCount',
+          type: 'select',
+          label: 'How many base locations would you ideally have?',
+          placeholder: 'Choose number of bases...',
+          options: [
+            { value: '2', label: 'Two bases (e.g., summer/winter homes)' },
+            { value: '3', label: 'Three bases (seasonal rotation)' },
+            { value: 'flexible', label: 'Flexible arrangements as needed' }
+          ],
+          icon: '🏘️'
+        },
+        {
+          id: 'multiBaseReason',
+          type: 'select',
+          label: 'What drives your desire for multiple bases?',
+          placeholder: 'Choose your motivation...',
+          options: [
+            { value: 'climate', label: 'Climate - Follow ideal weather year-round' },
+            { value: 'family', label: 'Family - Be close to different family members' },
+            { value: 'activities', label: 'Activities - Different locations for different interests' },
+            { value: 'cost', label: 'Cost - Optimize expenses across locations' },
+            { value: 'variety', label: 'Variety - Enjoy different environments and cultures' }
+          ],
+          icon: '🌤️'
+        },
+        {
+          id: 'baseTypes',
+          type: 'select',
+          label: 'What types of bases appeal to you?',
+          placeholder: 'Choose your base types...',
+          options: [
+            { value: 'owned-properties', label: 'Owned properties - Multiple homes you own' },
+            { value: 'mixed-owned-rental', label: 'Mixed - Some owned, some long-term rentals' },
+            { value: 'rental-arrangements', label: 'Rental arrangements - Seasonal leases' },
+            { value: 'community-memberships', label: 'Community memberships - Resort/club access' }
+          ],
+          icon: '🏠'
+        }
+      ],
+
+      'community-centered': [
+        {
+          id: 'proximityPriorities',
+          type: 'select',
+          label: 'What\'s your top proximity priority?',
+          placeholder: 'Choose your priority...',
+          options: [
+            { value: 'near-family', label: 'Near family - Close to children, grandchildren, siblings' },
+            { value: 'senior-community', label: 'Senior community - Active adult or 55+ community' },
+            { value: 'care-facilities', label: 'Care facilities - Access to healthcare and support services' },
+            { value: 'faith-community', label: 'Faith community - Near church, temple, or spiritual center' },
+            { value: 'lifelong-friends', label: 'Lifelong friends - Near established friend networks' },
+            { value: 'cultural-community', label: 'Cultural community - Shared interests and values' }
+          ],
+          icon: '❤️'
+        },
+        {
+          id: 'communityType',
+          type: 'select',
+          label: 'What type of community setting appeals to you?',
+          placeholder: 'Choose your community type...',
+          options: [
+            { value: 'age-in-place', label: 'Age in place - Stay in current community' },
+            { value: 'active-adult', label: 'Active adult community - 55+ with amenities' },
+            { value: 'continuing-care', label: 'Continuing care community - Healthcare on-site' },
+            { value: 'intentional-community', label: 'Intentional community - Shared values/lifestyle' },
+            { value: 'multigenerational', label: 'Multigenerational - Mixed ages and families' }
+          ],
+          icon: '🏘️'
+        },
+        {
+          id: 'supportLevel',
+          type: 'select',
+          label: 'What level of community support do you want?',
+          placeholder: 'Choose your support level...',
+          options: [
+            { value: 'independent', label: 'Independent - Minimal services, maximum autonomy' },
+            { value: 'some-services', label: 'Some services - Maintenance, activities, dining options' },
+            { value: 'comprehensive', label: 'Comprehensive - Full services and care options' },
+            { value: 'flexible', label: 'Flexible - Start independent, add services as needed' }
+          ],
+          icon: '🤝'
+        }
+      ]
+    };
+
+    return questionConfigs[archetype] || [];
+  };
+
+  // Enhanced Theme Detection Function
+  const detectDreamThemes = (text) => {
+    const lowercaseText = text.toLowerCase();
+    const detectedThemes = [];
+
+    // Define theme categories with their keywords and confidence scoring
+    const themePatterns = {
+      'Travel & Exploration': {
+        keywords: ['travel', 'explore', 'adventure', 'journey', 'countries', 'cultures', 'places', 'destinations', 'world', 'wanderlust', 'discover', 'experience'],
+        phrases: ['see the world', 'different countries', 'new places', 'explore different', 'travel around'],
+        icon: '🌍',
+        color: 'blue'
+      },
+      'Education & Teaching': {
+        keywords: ['teach', 'education', 'learn', 'mentor', 'coach', 'instruct', 'training', 'knowledge', 'wisdom', 'school', 'students', 'children'],
+        phrases: ['teach children', 'share knowledge', 'help others learn', 'educational programs'],
+        icon: '📚',
+        color: 'green'
+      },
+      'Creativity & Arts': {
+        keywords: ['art', 'creative', 'paint', 'draw', 'write', 'music', 'craft', 'design', 'photography', 'pottery', 'sculpt', 'artistic'],
+        phrases: ['creative pursuits', 'artistic expression', 'make art', 'creative projects'],
+        icon: '🎨',
+        color: 'purple'
+      },
+      'Community & Relationships': {
+        keywords: ['family', 'friends', 'community', 'relationships', 'together', 'social', 'connect', 'gather', 'neighbors', 'grandchildren'],
+        phrases: ['close to family', 'time with friends', 'community involvement', 'social connections'],
+        icon: '❤️',
+        color: 'pink'
+      },
+      'Nature & Outdoors': {
+        keywords: ['garden', 'nature', 'outdoors', 'hiking', 'beach', 'mountains', 'forest', 'wildlife', 'landscape', 'ocean', 'countryside'],
+        phrases: ['in nature', 'outdoor activities', 'natural environment', 'peaceful surroundings'],
+        icon: '🌿',
+        color: 'emerald'
+      },
+      'Purpose & Impact': {
+        keywords: ['volunteer', 'help', 'serve', 'impact', 'mission', 'purpose', 'meaningful', 'contribute', 'difference', 'charity', 'nonprofit'],
+        phrases: ['make a difference', 'help others', 'give back', 'meaningful work', 'positive impact'],
+        icon: '🌟',
+        color: 'yellow'
+      },
+      'Peace & Tranquility': {
+        keywords: ['peaceful', 'quiet', 'serene', 'calm', 'tranquil', 'meditation', 'mindful', 'relax', 'sanctuary', 'retreat'],
+        phrases: ['peaceful life', 'quiet moments', 'calm environment', 'stress-free'],
+        icon: '🕊️',
+        color: 'indigo'
+      },
+      'Adventure & Freedom': {
+        keywords: ['freedom', 'independent', 'adventure', 'flexible', 'spontaneous', 'exciting', 'dynamic', 'change', 'variety'],
+        phrases: ['complete freedom', 'flexible lifestyle', 'spontaneous adventures', 'no restrictions'],
+        icon: '🦅',
+        color: 'orange'
+      }
+    };
+
+    // Score each theme
+    Object.entries(themePatterns).forEach(([themeName, pattern]) => {
+      let score = 0;
+      let matchedElements = [];
+
+      // Check keywords
+      pattern.keywords.forEach(keyword => {
+        if (lowercaseText.includes(keyword)) {
+          score += 1;
+          matchedElements.push(keyword);
+        }
+      });
+
+      // Check phrases (higher weight)
+      pattern.phrases.forEach(phrase => {
+        if (lowercaseText.includes(phrase)) {
+          score += 3;
+          matchedElements.push(phrase);
+        }
+      });
+
+      // If we found matches, add the theme
+      if (score > 0) {
+        detectedThemes.push({
+          name: themeName,
+          score: score,
+          matchedElements: matchedElements.slice(0, 3), // Keep top 3 matches
+          icon: pattern.icon,
+          color: pattern.color,
+          confidence: Math.min(Math.round((score / 5) * 100), 95) // Scale confidence
+        });
+      }
+    });
+
+    // Sort by score and return top themes
+    return detectedThemes
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 4); // Return top 4 themes
+  };
+
+  // AI-Powered Dream Analysis Function
+  const analyzeDreamDescription = (text) => {
+    if (!text || text.trim().length < 20) {
+      return null;
+    }
+
+    const lowercaseText = text.toLowerCase();
+    const words = lowercaseText.split(/\s+/);
+    
+    // Define keyword patterns for each archetype with weights
+    const archetypePatterns = {
+      'nomadic-freedom': {
+        keywords: [
+          'travel', 'explore', 'adventure', 'journey', 'nomad', 'wander', 'roam',
+          'different countries', 'around the world', 'backpack', 'van life', 'rv',
+          'digital nomad', 'location independent', 'road trip', 'cruise', 'sail',
+          'experience', 'cultures', 'places', 'destinations', 'freedom', 'mobility',
+          'flexible', 'move', 'relocate', 'temporary', 'seasonal'
+        ],
+        phrases: [
+          'see the world', 'travel the world', 'explore different', 'live anywhere',
+          'work remotely', 'location independence', 'no permanent address',
+          'different cities', 'travel full time', 'house sitting'
+        ],
+        weight: 0,
+        description: 'a life of travel and exploration',
+        focus: 'funding your adventures and experiences rather than buying property'
+      },
+      
+      'purpose-driven': {
+        keywords: [
+          'volunteer', 'teach', 'help', 'serve', 'give back', 'impact', 'mission',
+          'nonprofit', 'charity', 'mentor', 'education', 'social', 'community service',
+          'meaningful', 'purpose', 'calling', 'contribution', 'difference', 'change',
+          'advocacy', 'justice', 'environment', 'conservation', 'healing', 'ministry'
+        ],
+        phrases: [
+          'help others', 'make a difference', 'give back', 'meaningful work',
+          'serve others', 'social impact', 'change the world', 'help people',
+          'teach children', 'volunteer work', 'mission work', 'start a nonprofit'
+        ],
+        weight: 0,
+        description: 'a life centered around meaningful contribution and service',
+        focus: 'supporting your mission with the resources and funding you need to make an impact'
+      },
+      
+      'rooted-living': {
+        keywords: [
+          'cottage', 'garden', 'settle', 'home', 'roots', 'community', 'neighborhood',
+          'property', 'house', 'land', 'farm', 'homestead', 'peaceful', 'quiet',
+          'stability', 'permanent', 'established', 'traditional', 'cozy', 'sanctuary',
+          'retreat', 'privacy', 'solitude', 'small town', 'rural', 'countryside'
+        ],
+        phrases: [
+          'settle down', 'put down roots', 'own a home', 'build a house',
+          'permanent home', 'quiet life', 'peaceful place', 'my sanctuary',
+          'grow old', 'retirement home', 'dream home', 'forever home'
+        ],
+        weight: 0,
+        description: 'a permanently rooted lifestyle with deep community connections',
+        focus: 'building wealth to purchase your ideal property and sustain your desired lifestyle'
+      },
+      
+      'multi-base': {
+        keywords: [
+          'seasonal', 'winter home', 'summer house', 'second home', 'multiple',
+          'split time', 'divide time', 'alternate', 'flexible', 'two homes',
+          'seasonal migration', 'snowbird', 'different seasons', 'variety',
+          'options', 'choice', 'flexibility', 'several places', 'climate'
+        ],
+        phrases: [
+          'multiple homes', 'seasonal homes', 'split my time', 'winter and summer',
+          'different places', 'variety of locations', 'flexible living',
+          'follow the weather', 'seasonal travel', 'multiple bases'
+        ],
+        weight: 0,
+        description: 'a flexible lifestyle with multiple home bases for different seasons or purposes',
+        focus: 'managing multiple properties or flexible arrangements across different locations'
+      },
+      
+      'community-centered': {
+        keywords: [
+          'family', 'grandchildren', 'children', 'parents', 'relatives', 'friends',
+          'social', 'community', 'together', 'nearby', 'close', 'support',
+          'senior community', 'retirement community', 'assisted living', 'care',
+          'companionship', 'relationships', 'church', 'faith community', 'cultural'
+        ],
+        phrases: [
+          'close to family', 'near my children', 'senior community', 'with friends',
+          'retirement community', 'faith community', 'cultural community',
+          'active adult', 'social activities', 'like-minded people'
+        ],
+        weight: 0,
+        description: 'a lifestyle that prioritizes relationships and community connections',
+        focus: 'choosing locations and arrangements that keep you close to the people who matter most'
+      }
+    };
+
+    // Calculate keyword matches
+    Object.keys(archetypePatterns).forEach(archetype => {
+      const pattern = archetypePatterns[archetype];
+      
+      // Check individual keywords
+      pattern.keywords.forEach(keyword => {
+        if (lowercaseText.includes(keyword)) {
+          pattern.weight += keyword.split(' ').length; // Multi-word keywords get more weight
+        }
+      });
+      
+      // Check phrases (higher weight)
+      pattern.phrases.forEach(phrase => {
+        if (lowercaseText.includes(phrase)) {
+          pattern.weight += phrase.split(' ').length * 2; // Phrases get double weight
+        }
+      });
+    });
+
+    // Find the archetype with the highest weight
+    const maxWeight = Math.max(...Object.values(archetypePatterns).map(p => p.weight));
+    
+    if (maxWeight === 0) {
+      return {
+        suggested: null,
+        confidence: 0,
+        explanation: "We couldn't identify a clear pattern in your description. Please choose an archetype that feels right to you, or provide more details about your ideal lifestyle."
+      };
+    }
+
+    const suggestedArchetype = Object.keys(archetypePatterns).find(
+      archetype => archetypePatterns[archetype].weight === maxWeight
+    );
+
+    const confidence = Math.min(Math.round((maxWeight / words.length) * 100), 95);
+    const pattern = archetypePatterns[suggestedArchetype];
+
+    return {
+      suggested: suggestedArchetype,
+      confidence: confidence,
+      description: pattern.description,
+      focus: pattern.focus,
+      explanation: `Based on your description, we think you're envisioning ${pattern.description}. This means we'll focus on ${pattern.focus}.`,
+      alternativesSuggested: Object.keys(archetypePatterns)
+        .filter(arch => arch !== suggestedArchetype && archetypePatterns[arch].weight > 0)
+        .sort((a, b) => archetypePatterns[b].weight - archetypePatterns[a].weight)
+        .slice(0, 2)
+    };
+  };
+
+  // Handle dream analysis with enhanced UX
+  const handleAnalyzeDream = async () => {
+    if (!formData.dreamDescription || formData.dreamDescription.trim().length < 50) {
+      alert('Please write a more detailed description of your retirement vision (at least 50 characters) so we can analyze it.');
+      return;
+    }
+
+    setAnalysisLoading(true);
+    
+    // Simulate AI processing time for realistic feel
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // Detect themes first
+    const themes = detectDreamThemes(formData.dreamDescription);
+    setDetectedThemes(themes);
+    
+    // Then analyze for archetype matching
+    const analysis = analyzeDreamDescription(formData.dreamDescription);
+    
+    // Enhanced analysis with theme integration
+    const enhancedAnalysis = {
+      ...analysis,
+      themes: themes,
+      processingTime: '2.3 seconds',
+      wordCount: formData.dreamDescription.trim().split(/\s+/).length,
+      complexity: themes.length > 3 ? 'Complex vision with multiple interests' : 'Focused vision with clear priorities'
+    };
+    
+    setDreamAnalysis(enhancedAnalysis);
+    setAnalysisLoading(false);
+    setShowAnalysisModal(true);
+  };
+
+  // Enhanced archetype data with visual elements, taglines, and examples
+  const getArchetypeCards = () => [
+    {
+      id: 'rooted-living',
+      name: 'Rooted Living',
+      icon: '🏡',
+      tagline: 'One perfect place',
+      subtitle: 'Create your permanent sanctuary',
+      color: 'from-emerald-400 to-green-500',
+      bgColor: 'bg-emerald-50',
+      borderColor: 'border-emerald-200',
+      hoverBorderColor: 'hover:border-emerald-400',
+      example: 'Like couples who buy vineyard properties in Tuscany or restore historic homes in charming New England towns',
+      questionsPreview: [
+        'What type of location appeals to you most?',
+        'What type of home would make you feel most rooted?',
+        'How important is having your own land or garden space?'
+      ]
+    },
+    {
+      id: 'nomadic-freedom',
+      name: 'Nomadic Freedom',
+      icon: '🧭',
+      tagline: 'The world is your home',
+      subtitle: 'Adventure without boundaries',
+      color: 'from-blue-400 to-cyan-500',
+      bgColor: 'bg-blue-50',
+      borderColor: 'border-blue-200',
+      hoverBorderColor: 'hover:border-blue-400',
+      example: 'Like teachers who spend each semester in a different country or retirees who RV across America following perfect weather',
+      questionsPreview: [
+        'What\'s your preferred travel style?',
+        'Do you need a small home base for storage?',
+        'What\'s your ideal travel pace?'
+      ]
+    },
+    {
+      id: 'purpose-driven',
+      name: 'Purpose-Driven',
+      icon: '💡',
+      tagline: 'Make your mark',
+      subtitle: 'Leave a meaningful legacy',
+      color: 'from-purple-400 to-indigo-500',
+      bgColor: 'bg-purple-50',
+      borderColor: 'border-purple-200',
+      hoverBorderColor: 'hover:border-purple-400',
+      example: 'Like executives who start nonprofit organizations or skilled professionals who teach in underserved communities',
+      questionsPreview: [
+        'What area of impact calls to you most?',
+        'How do you prefer to contribute?',
+        'What\'s your ideal time commitment level?'
+      ]
+    },
+    {
+      id: 'multi-base',
+      name: 'Multi-Base',
+      icon: '🗺️',
+      tagline: 'Best of many worlds',
+      subtitle: 'Flexibility and variety',
+      color: 'from-orange-400 to-amber-500',
+      bgColor: 'bg-orange-50',
+      borderColor: 'border-orange-200',
+      hoverBorderColor: 'hover:border-orange-400',
+      example: 'Like families with a ski condo in Colorado and beach house in Florida, or professionals who split time between city and countryside',
+      questionsPreview: [
+        'How many base locations would you ideally have?',
+        'What\'s your main reason for multiple bases?',
+        'What types of bases appeal to you?'
+      ]
+    },
+    {
+      id: 'community-centered',
+      name: 'Community-Centered',
+      icon: '🤝',
+      tagline: 'Surrounded by what matters',
+      subtitle: 'People come first',
+      color: 'from-pink-400 to-rose-500',
+      bgColor: 'bg-pink-50',
+      borderColor: 'border-pink-200',
+      hoverBorderColor: 'hover:border-pink-400',
+      example: 'Like grandparents who choose homes near their children or couples who join active adult communities with shared interests',
+      questionsPreview: [
+        'What\'s your top proximity priority?',
+        'What type of community appeals to you?',
+        'How involved do you want to be in community life?'
+      ]
+    }
+  ];
+
+  // Enhanced Archetype Card Component with hover preview
+  const ArchetypeCard = ({ archetype, isRecommended, onClick }) => {
+    const [showPreview, setShowPreview] = useState(false);
+
+    return (
+      <div 
+        className="relative"
+        onMouseEnter={() => setShowPreview(true)}
+        onMouseLeave={() => setShowPreview(false)}
+      >
+        <button
+          onClick={onClick}
+          className={`w-full p-6 text-left rounded-2xl transition-all duration-300 border-2 ${
+            isRecommended 
+              ? `border-purple-400 ${archetype.bgColor} transform scale-105 shadow-lg` 
+              : `${archetype.borderColor} ${archetype.hoverBorderColor} bg-white hover:bg-gray-50 hover:shadow-md transform hover:scale-105`
+          }`}
+        >
+          {/* Large Icon */}
+          <div className="flex justify-center mb-4">
+            <div className="text-6xl">{archetype.icon}</div>
+          </div>
+          
+          {/* Title and Tagline */}
+          <div className="text-center mb-4">
+            <h3 className="text-xl font-bold text-gray-800 mb-1">{archetype.name}</h3>
+            <p className="text-lg font-medium text-gray-600 italic">"{archetype.tagline}"</p>
+          </div>
+          
+          {/* Gradient Line */}
+          <div className={`h-1 bg-gradient-to-r ${archetype.color} rounded-full mb-4`}></div>
+          
+          {/* Example */}
+          <div className="mb-4">
+            <p className="text-sm text-gray-700 leading-relaxed">{archetype.example}</p>
+          </div>
+          
+          {/* Recommended Badge */}
+          {isRecommended && (
+            <div className="flex justify-center">
+              <span className="bg-purple-500 text-white px-4 py-2 rounded-full text-sm font-semibold">
+                ✨ Recommended for you
+              </span>
+            </div>
+          )}
+        </button>
+
+        {/* Hover Preview */}
+        {showPreview && (
+          <div className="absolute z-50 top-full left-1/2 transform -translate-x-1/2 mt-2 w-80 bg-white rounded-xl shadow-xl border-2 border-gray-200 p-4">
+            <div className="text-center mb-3">
+              <h4 className="font-semibold text-gray-800">Questions you'll be asked:</h4>
+            </div>
+            <ul className="space-y-2">
+              {archetype.questionsPreview.map((question, index) => (
+                <li key={index} className="flex items-start gap-2">
+                  <span className="text-gray-400 text-xs mt-1">•</span>
+                  <span className="text-sm text-gray-600">{question}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="text-center mt-3">
+              <span className="text-xs text-gray-500">Click to choose this path</span>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Check if current archetype has all required fields completed
+  const isArchetypeComplete = () => {
+    if (!formData.selectedArchetype) return false;
+    
+    const requiredFields = getArchetypeQuestions(formData.selectedArchetype);
+    return requiredFields.every(question => {
+      const value = formData[question.id];
+      return value && value.trim() !== '';
+    });
+  };
+
+  // Check if Zone 1 (dream description) is complete
+  const isZone1Complete = () => {
+    return formData.dreamDescription && formData.dreamDescription.trim().length >= 50;
+  };
+
+  // Check if Zone 2 (archetype selection) is complete
+  const isZone2Complete = () => {
+    return formData.selectedArchetype && formData.selectedArchetype.trim() !== '';
+  };
+
+  // Check if Zone 3 (archetype-specific questions) is complete
+  const isZone3Complete = () => {
+    return isZone2Complete() && isArchetypeComplete();
+  };
+
+  // Check if all zones are complete
+  const areAllZonesComplete = () => {
+    return isZone1Complete() && isZone2Complete() && isZone3Complete();
+  };
+
+  // Get validation errors for incomplete zones
+  const getValidationErrors = () => {
+    const errors = [];
+    
+    if (!isZone1Complete()) {
+      errors.push({
+        zone: 1,
+        message: 'Please describe your retirement vision above to continue',
+        action: 'Add more details to your dream description (at least 50 characters)'
+      });
+    }
+    
+    if (!isZone2Complete()) {
+      errors.push({
+        zone: 2,
+        message: 'Choose your retirement path to proceed',
+        action: 'Select one of the lifestyle archetypes'
+      });
+    }
+    
+    if (isZone2Complete() && !isZone3Complete()) {
+      const incompleteFields = getArchetypeQuestions(formData.selectedArchetype)
+        .filter(question => !formData[question.id] || formData[question.id].trim() === '')
+        .map(question => question.label);
+      
+      errors.push({
+        zone: 3,
+        message: 'Please complete all fields for your chosen path',
+        action: `Complete these fields: ${incompleteFields.join(', ')}`,
+        incompleteFields
+      });
+    }
+    
+    return errors;
+  };
+
+  // Navigate to next step with loading state
+  const goToNextStep = async () => {
+    if (!areAllZonesComplete()) return;
+    
+    setIsNavigating(true);
+    
+    // Simulate brief processing time for visual feedback
+    await new Promise(resolve => setTimeout(resolve, 800));
+    
+    setCurrentStep(2);
+    setIsNavigating(false);
+  };
+
+  // Handle accepting the suggested archetype
+  const handleAcceptSuggestion = (archetype) => {
+    updateFormData('selectedArchetype', archetype);
+    
+    // Set the dream description based on the archetype if not custom
+    if (archetype !== 'custom') {
+      const archetypeDescriptions = {
+        'rooted-living': 'A permanent home base where I can establish deep roots in a community, create a sanctuary that reflects my values, and build lasting relationships with neighbors and local institutions.',
+        'nomadic-freedom': 'A life of travel and adventure where I can explore different places, experience diverse cultures, and have the freedom to move wherever my curiosity leads me.',
+        'purpose-driven': 'A life centered around meaningful work and contribution, whether through volunteering, teaching, starting social ventures, or pursuing a mission that makes a positive impact on the world.',
+        'multi-base': 'A flexible lifestyle with multiple home bases - perhaps a primary residence and seasonal homes, or the ability to split time between different locations that serve different needs and seasons of life.',
+        'community-centered': 'A life that prioritizes relationships and community, whether that means being close to family, choosing a senior-friendly community, or living in an intentional community that shares my values and interests.'
+      };
+      
+      if (!formData.dreamDescription.includes(archetypeDescriptions[archetype])) {
+        updateFormData('dreamDescription', 
+          formData.dreamDescription + '\n\n' + archetypeDescriptions[archetype]
+        );
+      }
+    }
+    
+    setShowAnalysisModal(false);
+    setDreamAnalysis(null);
+  };
+
   // Validation function for age calculations
   const validateAgeCalculations = () => {
     const testCases = [
@@ -811,10 +1911,21 @@ const SomedayLifeBuilder = ({ onComplete, onBack }) => {
     const income = useIncomeRange 
       ? (incomeRanges.find(range => range.value === formData.incomeRange)?.midpoint || 0)
       : parseFloat(formData.incomeRange.toString().replace(/,/g, '')) || 0;
-    const averageCost = (formData.selectedLifestyle.propertyCost.min + formData.selectedLifestyle.propertyCost.max) / 2;
+    
+    // Handle both old structure (object with propertyCost) and new structure (string ID)
+    let averageCost = 0;
+    if (typeof formData.selectedLifestyle === 'string') {
+      // New structure - lifestyle is just an ID, need to calculate based on annual spending
+      const totalAnnualSpending = Object.values(formData.annualSpending || {})
+        .reduce((sum, value) => sum + (parseInt(value) || 0), 0);
+      averageCost = totalAnnualSpending * 25; // Using 4% rule (25x annual expenses)
+    } else if (formData.selectedLifestyle?.propertyCost) {
+      // Old structure - lifestyle object with property cost
+      averageCost = (formData.selectedLifestyle.propertyCost.min + formData.selectedLifestyle.propertyCost.max) / 2;
+    }
     
     return calculateAchievementAge(formData.currentAge, averageCost, income);
-  }, [formData.currentAge, formData.selectedLifestyle, formData.incomeRange, useIncomeRange]);
+  }, [formData.currentAge, formData.selectedLifestyle, formData.incomeRange, formData.annualSpending, useIncomeRange]);
 
   // Handle income input change with formatting
   const handleIncomeChange = (e) => {
@@ -1140,7 +2251,7 @@ const SomedayLifeBuilder = ({ onComplete, onBack }) => {
         return;
       }
 
-      if (!formData.selectedLifestyle) {
+      if (!formData.selectedLifestyle && !formData.selectedArchetype) {
         setCalculationError({
           type: 'missing_dream_data',
           message: 'We need your dream details first. Let\'s go back to complete them.',
@@ -1160,35 +2271,70 @@ const SomedayLifeBuilder = ({ onComplete, onBack }) => {
       console.log('💰 Using income:', primaryIncome);
       
       const totalIncome = primaryIncome; // No partner income in simplified version
-      const currentAge = parseInt(formData.currentAge) || 30;
-      const retirementAge = 65; // Default retirement age
+      const currentAge = Math.max(18, Math.min(80, parseInt(formData.currentAge) || 30)); // Clamp age between 18-80
+      const retirementAge = Math.max(currentAge + 1, 65); // Ensure retirement age is at least 1 year after current age
       
-      // Calculate costs - now using user-defined annual spending instead of preset ranges
-      const estimatedPropertyCost = (formData.selectedLifestyle.propertyCost.min + formData.selectedLifestyle.propertyCost.max) / 2;
+      console.log('📅 Age calculations:', {
+        formDataCurrentAge: formData.currentAge,
+        parsedCurrentAge: parseInt(formData.currentAge),
+        clampedCurrentAge: currentAge,
+        retirementAge
+      });
       
-      // Calculate total annual spending from user inputs
-      const totalAnnualSpending = Object.values(formData.annualSpending)
-        .filter(val => val && !isNaN(parseFloat(val)))
-        .reduce((sum, val) => sum + parseFloat(val), 0);
+      // Use archetype-based cost calculation
+      let lifecycleCosts;
+      let estimatedPropertyCost = 0;
+      let annualLivingCosts = 0;
       
-      // If no annual spending defined, fall back to lifestyle estimates
-      const annualLivingCosts = totalAnnualSpending > 0 
-        ? totalAnnualSpending 
-        : (formData.selectedLifestyle.annualExpenses.min + formData.selectedLifestyle.annualExpenses.max) / 2;
+      if (formData.selectedArchetype) {
+        // Use new archetype-based calculation
+        lifecycleCosts = calculateLifestyleCosts(formData.selectedArchetype, formData, formData.selectedState);
+        console.log('🏛️ Archetype-based costs:', lifecycleCosts);
+        
+        estimatedPropertyCost = lifecycleCosts.propertyCost ? 
+          (lifecycleCosts.propertyCost.min + lifecycleCosts.propertyCost.max) / 2 : 0;
+        
+        // Calculate total annual spending from user inputs first
+        const totalAnnualSpending = Object.values(formData.annualSpending)
+          .filter(val => val && !isNaN(parseFloat(val)))
+          .reduce((sum, val) => sum + parseFloat(val), 0);
+        
+        // Use user input if available, otherwise use archetype calculation
+        annualLivingCosts = totalAnnualSpending > 0 ? 
+          totalAnnualSpending : lifecycleCosts.annualCosts;
+          
+      } else if (formData.selectedLifestyle) {
+        // Fallback to old lifestyle calculation for backward compatibility
+        estimatedPropertyCost = (formData.selectedLifestyle.propertyCost.min + formData.selectedLifestyle.propertyCost.max) / 2;
+        
+        const totalAnnualSpending = Object.values(formData.annualSpending)
+          .filter(val => val && !isNaN(parseFloat(val)))
+          .reduce((sum, val) => sum + parseFloat(val), 0);
+        
+        annualLivingCosts = totalAnnualSpending > 0 ? 
+          totalAnnualSpending : (formData.selectedLifestyle.annualExpenses.min + formData.selectedLifestyle.annualExpenses.max) / 2;
+      }
       
       // Calculate required portfolio using 4% rule (25x annual expenses)
       const requiredPortfolio = annualLivingCosts * 25;
       
-      // Total Someday Life target = Property + Portfolio for financial independence
-      const requiredNetWorth = estimatedPropertyCost + requiredPortfolio;
+      // Total Someday Life target calculation depends on archetype
+      let requiredNetWorth;
+      if (lifecycleCosts?.costStructure === 'annual-only') {
+        // For nomadic lifestyle - no property, just portfolio for annual expenses
+        requiredNetWorth = requiredPortfolio;
+      } else {
+        // Traditional: Property + Portfolio for financial independence
+        requiredNetWorth = estimatedPropertyCost + requiredPortfolio;
+      }
       
       // Calculate disposable income (after taxes and living expenses)
       const netAnnualIncome = totalIncome * 0.78; // After taxes
       const currentLivingExpenses = Math.min(netAnnualIncome * 0.7, 50000); // Estimate current expenses
       const disposableIncome = Math.max(0, netAnnualIncome - currentLivingExpenses);
       
-      // Calculate monthly savings needed
-      const workingYears = retirementAge - currentAge;
+      // Calculate monthly savings needed with validation
+      const workingYears = Math.max(1, retirementAge - currentAge); // Ensure at least 1 year
       const monthlySavingsNeeded = workingYears > 0 ? requiredNetWorth / (workingYears * 12) : 0;
 
       console.log('💰 Financial calculations:', {
@@ -1197,9 +2343,10 @@ const SomedayLifeBuilder = ({ onComplete, onBack }) => {
         monthlySavingsNeeded
       });
 
-      // Create comprehensive profile with career context
+      // Create comprehensive profile with career context and archetype
       const userProfile = new UserProfile({
         age: currentAge,
+        lifestyleArchetype: formData.selectedArchetype, // Store archetype in profile
         location: { state: formData.selectedState },
         income: {
           gross: { annual: totalIncome },
@@ -1289,19 +2436,13 @@ const SomedayLifeBuilder = ({ onComplete, onBack }) => {
       }
 
           // Save to localStorage with clear distinction from other dreams
-      // Check if Someday Life goal already exists
+      // Check if Someday Life goal already exists - handle smoothly without modal
       const existingSomedayLife = DreamService.getSomedayLifeGoal()
       
       if (existingSomedayLife) {
-        const shouldReplace = await DreamService.confirmSomedayLifeReplacement({
-          title: northStarDream.title,
-          description: northStarDream.description
-        })
-        
-        if (!shouldReplace) {
-          console.log('User chose not to replace existing Someday Life goal')
-          return
-        }
+        console.log('Updating existing Someday Life goal:', existingSomedayLife.title, '→', northStarDream.title)
+        // Silently replace - this is expected behavior in the flow
+        DreamService.deleteDream(existingSomedayLife.id)
       }
       
       // Convert NorthStarDream to DreamService format
@@ -1312,7 +2453,27 @@ const SomedayLifeBuilder = ({ onComplete, onBack }) => {
         target_amount: northStarDream.requiredNetWorth,
         property_cost: northStarDream.estimatedCost,
         annual_expenses: northStarDream.totalAnnualCost,
-        target_date: new Date(new Date().getFullYear() + northStarDream.timeline, 11, 31).toISOString(),
+        target_date: (() => {
+          try {
+            // Validate timeline value before creating date
+            const timeline = northStarDream.timeline || 1; // Default to 1 year if invalid
+            const currentYear = new Date().getFullYear();
+            const targetYear = currentYear + Math.max(1, Math.min(50, timeline)); // Clamp between 1-50 years
+            const targetDate = new Date(targetYear, 11, 31); // December 31st of target year
+            
+            // Validate the created date
+            if (isNaN(targetDate.getTime())) {
+              console.warn('Invalid target date created, using fallback');
+              return new Date(currentYear + 10, 11, 31).toISOString(); // 10 years from now as fallback
+            }
+            
+            return targetDate.toISOString();
+          } catch (error) {
+            console.error('Error creating target date:', error);
+            // Fallback to 10 years from now
+            return new Date(new Date().getFullYear() + 10, 11, 31).toISOString();
+          }
+        })(),
         category: 'freedom',
         location: northStarDream.location,
         housing_type: northStarDream.housingType,
@@ -1434,230 +2595,488 @@ const SomedayLifeBuilder = ({ onComplete, onBack }) => {
           cursor: pointer;
           border: none;
         }
+        
+        .animate-fade-in {
+          animation: fadeIn 0.8s ease-out forwards;
+        }
+        
+        .zone-unlock {
+          animation: zoneUnlock 1.2s ease-out forwards;
+        }
+        
+        .attention-pulse {
+          animation: attentionPulse 2s ease-in-out infinite;
+        }
+        
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        
+        @keyframes zoneUnlock {
+          0% {
+            opacity: 0;
+            transform: translateY(40px) scale(0.95);
+            border-color: #e5e7eb;
+          }
+          50% {
+            transform: translateY(-10px) scale(1.02);
+          }
+          100% {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+        }
+        
+        @keyframes attentionPulse {
+          0%, 100% {
+            box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.4);
+          }
+          50% {
+            box-shadow: 0 0 0 20px rgba(139, 92, 246, 0);
+          }
+        }
       `}</style>
 
       <div className="max-w-4xl mx-auto px-4">
         <ProgressIndicator />
 
-        {/* Step 1: Dream Capture */}
+        {/* Step 1: Dream Capture - Three Zone Layout */}
         {currentStep === 1 && (
-          <div className="bg-white rounded-2xl shadow-xl p-8">
-            <div className="text-center mb-8">
-              <h3 className="text-3xl font-bold text-gray-800 mb-4">{getSomedayBuilderContent('stepIntro', 'Envision Your Someday Life')}</h3>
-              <p className="text-lg text-gray-600 mb-4">
+          <div className="space-y-12">
+            {/* Header Section */}
+            <div className="text-center mb-12">
+              <h3 className="text-4xl font-bold text-gray-900 mb-6">{getSomedayBuilderContent('stepIntro', 'Envision Your Someday Life')}</h3>
+              <p className="text-xl text-gray-600 mb-8 max-w-4xl mx-auto leading-relaxed">
                 This is different from other savings goals - we're designing your complete lifestyle transformation for when work becomes optional.
               </p>
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 max-w-2xl mx-auto">
-                <p className="text-sm text-blue-800">
+              <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-2xl p-6 max-w-3xl mx-auto">
+                <p className="text-blue-800 text-lg">
                   💡 <strong>Key Insight:</strong> Instead of just saving for retirement, we're calculating both the assets you'll need (like property) 
                   AND the portfolio required to sustain your ideal annual spending forever using the 4% rule.
                 </p>
               </div>
             </div>
 
-            {/* Dream Starting Points */}
-            <div className="mb-8">
-              <h4 className="text-xl font-semibold text-gray-700 mb-4 text-center">Popular dream starting points</h4>
-              <div className="grid md:grid-cols-3 gap-4 mb-6">
-                {/* Beach House */}
+            {/* ZONE 1: Dream Articulation (40% of screen) */}
+            <div className={`relative transition-all duration-700 ${
+              formData.dreamDescription && formData.dreamDescription.trim().length >= 50 
+                ? 'bg-green-50 border-green-200' 
+                : 'bg-white border-gray-200 attention-pulse'
+            } border-2 rounded-3xl p-8 shadow-lg hover:shadow-xl`}>
+              {/* Zone Indicator */}
+              <div className="absolute -top-4 left-8 bg-white px-4 py-2 rounded-full border border-gray-200 shadow-sm">
+                <span className="text-sm font-semibold text-gray-600">Zone 1</span>
+              </div>
+              
+              <div className="text-center mb-8">
+                <div className="flex items-center justify-center gap-3 mb-6">
+                  <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center">
+                    <span className="text-2xl">✨</span>
+                  </div>
+                  <h4 className="text-3xl font-bold text-gray-900">Start with Your Dream</h4>
+                </div>
+                <p className="text-xl text-gray-700 max-w-4xl mx-auto leading-relaxed">
+                  Close your eyes and imagine your perfect retirement day. What do you see yourself doing? 
+                  Where are you? Who's with you? What brings you joy?
+                </p>
+              </div>
+              
+              <div className="space-y-6">
+                <div className="relative">
+                  <textarea
+                    value={formData.dreamDescription}
+                    onChange={(e) => updateFormData('dreamDescription', e.target.value)}
+                    rows={12}
+                    className={`w-full p-8 text-xl leading-relaxed resize-none rounded-2xl transition-all duration-300 ${
+                      formData.dreamDescription && formData.dreamDescription.trim().length >= 50
+                        ? 'border-2 border-green-400 bg-white focus:border-green-500 focus:ring-4 focus:ring-green-100'
+                        : 'border-2 border-gray-300 bg-gray-50 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 focus:bg-white'
+                    } focus:outline-none`}
+placeholder={getSomedayBuilderContent('dreamPlaceholder', 'Describe your ideal retirement lifestyle...')}
+                  />
+                  
+                  {/* Character count indicator */}
+                  <div className="absolute bottom-4 right-4 flex items-center gap-2">
+                    <div className={`w-3 h-3 rounded-full ${
+                      formData.dreamDescription && formData.dreamDescription.trim().length >= 50 
+                        ? 'bg-green-500' 
+                        : 'bg-gray-300'
+                    }`}></div>
+                    <span className={`text-sm font-medium ${
+                      formData.dreamDescription && formData.dreamDescription.trim().length >= 50 
+                        ? 'text-green-600' 
+                        : 'text-gray-400'
+                    }`}>
+                      {formData.dreamDescription ? formData.dreamDescription.trim().length : 0}/50
+                    </span>
+                  </div>
+                </div>
+                
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-3">
+                    {formData.dreamDescription && formData.dreamDescription.trim().length >= 50 ? (
+                      <div className="flex items-center gap-2 text-green-600">
+                        <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+                          <span className="text-white text-sm">✓</span>
+                        </div>
+                        <span className="font-semibold">Ready to analyze your vision!</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 text-gray-500">
+                        <div className="w-6 h-6 border-2 border-gray-300 rounded-full"></div>
+                        <span>Share your dream to unlock AI analysis</span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <button
+                    onClick={handleAnalyzeDream}
+                    disabled={!formData.dreamDescription || formData.dreamDescription.trim().length < 50 || analysisLoading}
+                    className={`flex items-center gap-3 px-10 py-5 rounded-2xl font-bold text-lg transition-all transform ${
+                      formData.dreamDescription && formData.dreamDescription.trim().length >= 50 && !analysisLoading
+                        ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:from-purple-700 hover:to-blue-700 hover:scale-105 shadow-xl hover:shadow-2xl'
+                        : analysisLoading
+                        ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white cursor-wait scale-105'
+                        : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                    }`}
+                  >
+                    {analysisLoading ? (
+                      <>
+                        <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Understanding your vision...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-6 h-6" />
+                        Analyze My Dream with AI
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* ZONE 2: Archetype Selection (Progressive Disclosure) */}
+            {formData.dreamDescription && formData.dreamDescription.trim().length >= 50 && (
+              <div className={`relative transition-all duration-1000 zone-unlock ${
+                formData.selectedArchetype 
+                  ? 'bg-blue-50 border-blue-200' 
+                  : 'bg-gray-50 border-gray-200 attention-pulse'
+              } border-2 rounded-3xl p-8 shadow-lg hover:shadow-xl`}>
+                {/* Zone Indicator */}
+                <div className="absolute -top-4 left-8 bg-white px-4 py-2 rounded-full border border-gray-200 shadow-sm">
+                  <span className="text-sm font-semibold text-gray-600">Zone 2</span>
+                </div>
+                
+                {/* Zone unlock animation */}
+                <div className="absolute -top-6 right-8 animate-bounce">
+                  <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                    <span className="text-white text-sm">🔓</span>
+                  </div>
+                </div>
+                
+                <div className="text-center mb-8">
+                  <div className="flex items-center justify-center gap-3 mb-6">
+                    <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-blue-500 rounded-full flex items-center justify-center">
+                      <span className="text-2xl">🎯</span>
+                    </div>
+                    <h4 className="text-3xl font-bold text-gray-900">Choose Your Path</h4>
+                  </div>
+                  <p className="text-xl text-gray-700 max-w-4xl mx-auto leading-relaxed">
+                    Based on what you've shared, here are lifestyle paths that might resonate with your vision. 
+                    Choose the one that feels most aligned with your dreams.
+                  </p>
+                </div>
+              
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                {/* Rooted Living */}
                 <button
                   onClick={() => {
-                    updateFormData('dreamDescription', 'A beautiful oceanfront house with stunning views where I can wake up to the sound of waves and enjoy peaceful mornings by the sea.');
-                    updateFormData('selectedLocation', 'coastal');
-                    updateFormData('selectedHousingType', 'cottage');
+                    updateFormData('selectedArchetype', 'rooted-living');
+                    updateFormData('dreamDescription', 'A permanent home base where I can establish deep roots in a community, create a sanctuary that reflects my values, and build lasting relationships with neighbors and local institutions.');
                   }}
-                  className="group bg-white rounded-xl p-4 border-2 border-gray-200 transition-all duration-300 hover:shadow-lg hover:border-teal-300"
+                  className={`group bg-white rounded-xl p-4 border-2 transition-all duration-300 hover:shadow-lg ${
+                    formData.selectedArchetype === 'rooted-living' 
+                      ? 'border-emerald-400 bg-emerald-50' 
+                      : 'border-gray-200 hover:border-emerald-300'
+                  }`}
                 >
-                  <div className="w-full h-24 bg-gradient-to-br from-blue-200 to-cyan-300 rounded-xl flex items-center justify-center mb-3">
+                  <div className="w-full h-24 bg-gradient-to-br from-emerald-200 to-green-300 rounded-xl flex items-center justify-center mb-3">
                     <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M12 2L2 7v10c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7l-10-5zM7 18v-7h10v7H7z"/>
                       <path d="M8 11h8v2H8z"/>
                     </svg>
                   </div>
-                  <h5 className="text-lg font-semibold text-gray-900 group-hover:text-teal-600 transition-colors">
-                    Beach House
+                  <h5 className="text-lg font-semibold text-gray-900 group-hover:text-emerald-600 transition-colors">
+                    Rooted Living
                   </h5>
-                  <p className="text-gray-600 text-sm mt-1">
-                    Ocean views and peaceful mornings
+                  <p className="text-emerald-700 text-sm font-medium mt-1">
+                    Create your permanent sanctuary
+                  </p>
+                  <p className="text-gray-600 text-xs mt-1">
+                    Deep roots, lasting connections, and a home that reflects your values
                   </p>
                 </button>
 
-                {/* Mountain Cabin */}
+                {/* Nomadic Freedom */}
                 <button
                   onClick={() => {
-                    updateFormData('dreamDescription', 'A peaceful mountain retreat surrounded by nature where I can enjoy hiking trails, starlit skies, and the tranquility of mountain living.');
-                    updateFormData('selectedLocation', 'mountain');
-                    updateFormData('selectedHousingType', 'cabin');
+                    updateFormData('selectedArchetype', 'nomadic-freedom');
+                    updateFormData('dreamDescription', 'A life of travel and adventure where I can explore different places, experience diverse cultures, and have the freedom to move wherever my curiosity leads me.');
                   }}
-                  className="group bg-white rounded-xl p-4 border-2 border-gray-200 transition-all duration-300 hover:shadow-lg hover:border-teal-300"
+                  className={`group bg-white rounded-xl p-4 border-2 transition-all duration-300 hover:shadow-lg ${
+                    formData.selectedArchetype === 'nomadic-freedom' 
+                      ? 'border-blue-400 bg-blue-50' 
+                      : 'border-gray-200 hover:border-blue-300'
+                  }`}
                 >
-                  <div className="w-full h-24 bg-gradient-to-br from-green-200 to-emerald-300 rounded-xl flex items-center justify-center mb-3">
+                  <div className="w-full h-24 bg-gradient-to-br from-blue-200 to-cyan-300 rounded-xl flex items-center justify-center mb-3">
                     <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M12 3L2 12h3v8h6v-6h2v6h6v-8h3L12 3z"/>
-                      <path d="M7 14h2v2H7z"/>
-                      <path d="M11 14h2v2h-2z"/>
-                      <path d="M15 14h2v2h-2z"/>
+                      <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/>
+                      <path d="M9 12l2 2 4-4"/>
                     </svg>
                   </div>
-                  <h5 className="text-lg font-semibold text-gray-900 group-hover:text-teal-600 transition-colors">
-                    Mountain Cabin
+                  <h5 className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
+                    Nomadic Freedom
                   </h5>
-                  <p className="text-gray-600 text-sm mt-1">
-                    Nature retreat and tranquility
+                  <p className="text-blue-700 text-sm font-medium mt-1">
+                    Adventure without boundaries
+                  </p>
+                  <p className="text-gray-600 text-xs mt-1">
+                    Explore the world, experience cultures, live wherever curiosity leads
                   </p>
                 </button>
 
-                {/* City Apartment */}
+                {/* Purpose-Driven */}
                 <button
                   onClick={() => {
-                    updateFormData('dreamDescription', 'A modern urban apartment in the heart of the city with access to cultural attractions, great restaurants, and a vibrant community lifestyle.');
-                    updateFormData('selectedLocation', 'urban');
-                    updateFormData('selectedHousingType', 'loft');
+                    updateFormData('selectedArchetype', 'purpose-driven');
+                    updateFormData('dreamDescription', 'A life centered around meaningful work and contribution, whether through volunteering, teaching, starting social ventures, or pursuing a mission that makes a positive impact on the world.');
                   }}
-                  className="group bg-white rounded-xl p-4 border-2 border-gray-200 transition-all duration-300 hover:shadow-lg hover:border-teal-300"
+                  className={`group bg-white rounded-xl p-4 border-2 transition-all duration-300 hover:shadow-lg ${
+                    formData.selectedArchetype === 'purpose-driven' 
+                      ? 'border-purple-400 bg-purple-50' 
+                      : 'border-gray-200 hover:border-purple-300'
+                  }`}
                 >
                   <div className="w-full h-24 bg-gradient-to-br from-purple-200 to-indigo-300 rounded-xl flex items-center justify-center mb-3">
                     <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
                     </svg>
                   </div>
-                  <h5 className="text-lg font-semibold text-gray-900 group-hover:text-teal-600 transition-colors">
-                    City Apartment
+                  <h5 className="text-lg font-semibold text-gray-900 group-hover:text-purple-600 transition-colors">
+                    Purpose-Driven
                   </h5>
-                  <p className="text-gray-600 text-sm mt-1">
-                    Urban culture and convenience
+                  <p className="text-purple-700 text-sm font-medium mt-1">
+                    Make your mark on the world
+                  </p>
+                  <p className="text-gray-600 text-xs mt-1">
+                    Dedicate your time to causes that matter and create lasting impact
+                  </p>
+                </button>
+
+                {/* Multi-Base */}
+                <button
+                  onClick={() => {
+                    updateFormData('selectedArchetype', 'multi-base');
+                    updateFormData('dreamDescription', 'A flexible lifestyle with multiple home bases - perhaps a primary residence and seasonal homes, or the ability to split time between different locations that serve different needs and seasons of life.');
+                  }}
+                  className={`group bg-white rounded-xl p-4 border-2 transition-all duration-300 hover:shadow-lg ${
+                    formData.selectedArchetype === 'multi-base' 
+                      ? 'border-orange-400 bg-orange-50' 
+                      : 'border-gray-200 hover:border-orange-300'
+                  }`}
+                >
+                  <div className="w-full h-24 bg-gradient-to-br from-orange-200 to-amber-300 rounded-xl flex items-center justify-center mb-3">
+                    <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 3L2 12h3v8h6v-6h2v6h6v-8h3L12 3z"/>
+                      <path d="M7 14h2v2H7z M15 14h2v2h-2z"/>
+                    </svg>
+                  </div>
+                  <h5 className="text-lg font-semibold text-gray-900 group-hover:text-orange-600 transition-colors">
+                    Multi-Base
+                  </h5>
+                  <p className="text-orange-700 text-sm font-medium mt-1">
+                    Flexibility and variety
+                  </p>
+                  <p className="text-gray-600 text-xs mt-1">
+                    Why choose one place? Enjoy seasonal homes and location freedom
+                  </p>
+                </button>
+
+                {/* Community-Centered */}
+                <button
+                  onClick={() => {
+                    updateFormData('selectedArchetype', 'community-centered');
+                    updateFormData('dreamDescription', 'A life that prioritizes relationships and community, whether that means being close to family, choosing a senior-friendly community, or living in an intentional community that shares my values and interests.');
+                  }}
+                  className={`group bg-white rounded-xl p-4 border-2 transition-all duration-300 hover:shadow-lg ${
+                    formData.selectedArchetype === 'community-centered' 
+                      ? 'border-pink-400 bg-pink-50' 
+                      : 'border-gray-200 hover:border-pink-300'
+                  }`}
+                >
+                  <div className="w-full h-24 bg-gradient-to-br from-pink-200 to-rose-300 rounded-xl flex items-center justify-center mb-3">
+                    <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M16 7c0-2.21-1.79-4-4-4S8 4.79 8 7s1.79 4 4 4 4-1.79 4-4zM12 14c-3.31 0-6 2.69-6 6h12c0-3.31-2.69-6-6-6z"/>
+                      <circle cx="18.5" cy="8.5" r="2.5"/>
+                      <path d="M21 16c0-1.66-1.34-3-3-3s-3 1.34-3 3"/>
+                    </svg>
+                  </div>
+                  <h5 className="text-lg font-semibold text-gray-900 group-hover:text-pink-600 transition-colors">
+                    Community-Centered
+                  </h5>
+                  <p className="text-pink-700 text-sm font-medium mt-1">
+                    Surrounded by what matters most
+                  </p>
+                  <p className="text-gray-600 text-xs mt-1">
+                    Place relationships at the center of your retirement lifestyle
                   </p>
                 </button>
               </div>
+              
               <div className="text-center">
-                <p className="text-sm text-gray-500">Or describe your own unique vision below</p>
+                <p className="text-sm text-gray-500">Choose an archetype above, or continue customizing your vision below</p>
               </div>
-            </div>
-
-            {/* Dream Description */}
-            <div className="mb-8">
-              <label className="block text-xl font-semibold text-gray-700 mb-4">
-                {getSomedayBuilderContent('lifeVisionPrompt', 'Describe your someday life')}
-              </label>
-              <textarea
-                value={formData.dreamDescription}
-                onChange={(e) => updateFormData('dreamDescription', e.target.value)}
-                rows={5}
-                className="w-full p-4 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none resize-none"
-                placeholder="Imagine waking up without an alarm... What does your perfect day look like? Where are you? What are you doing? Who are you with? Paint us a picture of your someday life..."
-              />
-            </div>
-
-            {/* Image Gallery */}
-            <div className="mb-8">
-              <label className="block text-xl font-semibold text-gray-700 mb-4">
-                Add inspiration images (optional)
-              </label>
-              <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-blue-400 transition-colors">
-                <input
-                  type="file"
-                  multiple
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="hidden"
-                  id="image-upload"
-                />
-                <label htmlFor="image-upload" className="cursor-pointer">
-                  <Sparkles className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                  <p className="text-lg text-gray-600 mb-2">Upload images that inspire your someday life</p>
-                  <p className="text-sm text-gray-500">PNG, JPG up to 10MB each</p>
-                </label>
               </div>
+            )}
 
-              {/* Display uploaded images */}
-              {formData.inspirationImages.length > 0 && (
-                <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {formData.inspirationImages.map((image, index) => (
-                    <div key={index} className="relative group">
-                      <img
-                        src={image}
-                        alt={`Inspiration ${index + 1}`}
-                        className="w-full h-24 object-cover rounded-lg shadow-md"
-                      />
-                      <button
-                        onClick={() => removeImage(index)}
-                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+            {/* ZONE 3: Specific Details (Only after archetype selection) */}
+            {formData.selectedArchetype && (
+              <div className="relative transition-all duration-1000 zone-unlock bg-purple-50 border-2 border-purple-200 rounded-3xl p-8 shadow-lg hover:shadow-xl">
+                {/* Zone Indicator */}
+                <div className="absolute -top-4 left-8 bg-white px-4 py-2 rounded-full border border-gray-200 shadow-sm">
+                  <span className="text-sm font-semibold text-gray-600">Zone 3</span>
+                </div>
+                
+                {/* Zone unlock animation */}
+                <div className="absolute -top-6 right-8 animate-bounce">
+                  <div className="w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center">
+                    <span className="text-white text-sm">✨</span>
+                  </div>
+                </div>
+                
+                <div className="text-center mb-8">
+                  <div className="flex items-center justify-center gap-3 mb-6">
+                    <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
+                      <span className="text-2xl">🔍</span>
+                    </div>
+                    <h4 className="text-3xl font-bold text-gray-900">
+                      Perfect Your {formData.selectedArchetype.replace('-', ' ')} Vision
+                    </h4>
+                  </div>
+                  <p className="text-xl text-gray-700 max-w-4xl mx-auto leading-relaxed">
+                    Now let's get specific about your {formData.selectedArchetype.replace('-', ' ')} path. 
+                    These details will help us create a precise financial plan for your retirement lifestyle.
+                  </p>
+                </div>
+                
+                <div className="bg-white rounded-2xl p-8 border border-purple-200">
+                  <div className="space-y-8">
+                    {getArchetypeQuestions(formData.selectedArchetype).map((question, index) => (
+                      <div 
+                        key={question.id}
+                        className="animate-fade-in"
+                        style={{ animationDelay: `${index * 150}ms` }}
                       >
-                        <X className="w-4 h-4" />
-                      </button>
+                      <DynamicFormField
+                        question={question}
+                        value={formData[question.id]}
+                        onChange={updateFormData}
+                        hasError={!formData[question.id] || formData[question.id].trim() === ''}
+                      />
+                      </div>
+                    ))}
+                  </div>
+                  
+                </div>
+              </div>
+            )}
+
+            {/* Smart Navigation Section */}
+            <div className="mt-8">
+              {/* Validation Errors Display */}
+              {!areAllZonesComplete() && (
+                <div className="mb-6 space-y-4">
+                  {getValidationErrors().map((error, index) => (
+                    <div key={index} className="p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
+                      <div className="flex items-start gap-3">
+                        <div className="w-6 h-6 bg-yellow-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <span className="text-yellow-600 text-sm font-semibold">{error.zone}</span>
+                        </div>
+                        <div>
+                          <p className="text-yellow-800 font-medium mb-1">{error.message}</p>
+                          <p className="text-yellow-700 text-sm">{error.action}</p>
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>
               )}
-            </div>
 
-            {/* Location and Housing Selectors */}
-            <div className="grid md:grid-cols-2 gap-6 mb-8">
-              <div>
-                <label className="block text-xl font-semibold text-gray-700 mb-4">
-                  Location preference
-                </label>
-                <select
-                  value={formData.selectedLocation}
-                  onChange={(e) => updateFormData('selectedLocation', e.target.value)}
-                  className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none"
-                >
-                  <option value="">Choose location type...</option>
-                  <option value="coastal">Coastal area</option>
-                  <option value="mountain">Mountain region</option>
-                  <option value="rural">Rural countryside</option>
-                  <option value="suburban">Suburban area</option>
-                  <option value="urban">Urban center</option>
-                  <option value="desert">Desert region</option>
-                </select>
-              </div>
+              {/* Contextual Transition Message */}
+              {areAllZonesComplete() && (
+                <div className="mb-6 p-6 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl">
+                  <div className="text-center">
+                    <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <span className="text-2xl">🎯</span>
+                    </div>
+                    <h4 className="text-xl font-bold text-green-800 mb-2">Perfect! Your Vision is Complete</h4>
+                    <p className="text-green-700 leading-relaxed">
+                      You've painted a clear picture of your <strong>{formData.selectedArchetype.replace('-', ' ')}</strong> retirement. 
+                      Now let's understand your current financial position to map the journey from here to there.
+                    </p>
+                  </div>
+                </div>
+              )}
 
-              <div>
-                <label className="block text-xl font-semibold text-gray-700 mb-4">
-                  Housing style
-                </label>
-                <select
-                  value={formData.selectedHousingType}
-                  onChange={(e) => updateFormData('selectedHousingType', e.target.value)}
-                  className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none"
-                >
-                  <option value="">Choose housing style...</option>
-                  <option value="cottage">Cottage</option>
-                  <option value="modern">Modern</option>
-                  <option value="farmhouse">Farmhouse</option>
-                  <option value="cabin">Cabin</option>
-                  <option value="victorian">Victorian</option>
-                  <option value="ranch">Ranch</option>
-                  <option value="loft">Loft</option>
-                  <option value="lakehouse">Lakehouse</option>
-                </select>
-              </div>
-            </div>
+              {/* Navigation Button */}
+              {formData.selectedArchetype && (
+                <div className="border-t border-gray-200 pt-6">
+                  <div className="text-center mb-4">
+                    <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 border border-blue-200 rounded-full">
+                      <span className="text-blue-600 text-sm font-medium">Step 1 of 3 Complete</span>
+                      <div className="w-6 h-2 bg-blue-200 rounded-full overflow-hidden">
+                        <div className="w-2 h-full bg-blue-600 rounded-full"></div>
+                      </div>
+                    </div>
+                  </div>
 
-            {/* Validation message */}
-            {(!formData.dreamDescription.trim() || !formData.selectedLocation || !formData.selectedHousingType) && (
-              <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
-                <p className="text-amber-800 text-sm">
-                  Please complete all fields to continue to the next step.
-                </p>
-              </div>
-            )}
-
-            {/* Navigation */}
-            <div className="flex justify-between">
-              <button
-                onClick={handleBack}
-                className="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors"
-              >
-                Back
-              </button>
-              <button
-                onClick={handleNext}
-                disabled={!formData.dreamDescription.trim() || !formData.selectedLocation || !formData.selectedHousingType}
-                className="px-8 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-              >
-                Next: Choose Lifestyle
-              </button>
+                  {areAllZonesComplete() ? (
+                    <button
+                      onClick={goToNextStep}
+                      disabled={isNavigating}
+                      className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 px-8 rounded-xl font-semibold text-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:transform-none shadow-lg"
+                    >
+                      {isNavigating ? (
+                        <div className="flex items-center justify-center gap-3">
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          <span>Preparing your financial snapshot...</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center gap-2">
+                          <span>Continue to Financial Reality Check</span>
+                          <span className="text-xl">→</span>
+                        </div>
+                      )}
+                    </button>
+                  ) : (
+                    <button
+                      disabled
+                      className="w-full bg-gray-300 text-gray-500 py-4 px-8 rounded-xl font-semibold text-lg cursor-not-allowed"
+                    >
+                      Complete all sections above to continue
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1666,790 +3085,180 @@ const SomedayLifeBuilder = ({ onComplete, onBack }) => {
         {currentStep === 2 && (
           <div className="bg-white rounded-2xl shadow-xl p-8">
             <div className="text-center mb-8">
+              <div className="bg-gradient-to-r from-green-100 to-blue-100 rounded-2xl p-4 mb-6">
+                <p className="text-sm text-gray-700">
+                  <strong>Step 2 of 3:</strong> First, let's paint a picture of your ideal retirement
+                </p>
+              </div>
               <h3 className="text-3xl font-bold text-gray-800 mb-4">Design Your Someday Life</h3>
               <p className="text-lg text-gray-600 mb-6">
                 Choose your ideal lifestyle and define your annual spending for complete financial independence.
               </p>
               
-              {/* Ranking explanation */}
-              <div className="bg-gray-50 rounded-xl p-4 max-w-2xl mx-auto">
-                <div className="flex flex-wrap justify-center gap-4 text-sm">
-                  <div className="flex items-center gap-2">
-                    <div className="bg-green-500 text-white px-2 py-1 rounded-full text-xs font-semibold">
-                      Best Match
-                    </div>
-                    <span className="text-gray-600">Perfect for your preferences</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="bg-blue-500 text-white px-2 py-1 rounded-full text-xs font-semibold">
-                      Great Option
-                    </div>
-                    <span className="text-gray-600">Highly compatible</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-500 text-xs">Other Possibilities</span>
-                    <span className="text-gray-600">Worth considering</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Lifestyle Options - Ranked by preferences */}
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-              {getRankedLifestyleOptions().map((lifestyle) => (
-                <div
-                  key={lifestyle.id}
-                  onClick={() => handleLifestyleSelect(lifestyle)}
-                  className={`
-                    relative cursor-pointer rounded-xl border-2 transition-all duration-300 overflow-hidden
-                    ${formData.selectedLifestyle?.id === lifestyle.id 
-                      ? 'ring-4 ring-blue-500 shadow-xl' 
-                      : lifestyle.rank === 'best'
-                        ? 'border-green-400 hover:border-green-500 shadow-lg'
-                        : lifestyle.rank === 'great'
-                          ? 'border-blue-300 hover:border-blue-400 shadow-md'
-                          : 'border-gray-200 hover:border-blue-300 hover:shadow-lg'
-                    }
-                  `}
-                >
-                  <div className="aspect-video relative">
-                    <img
-                      src={seasonalView[lifestyle.id] === 'winter' ? lifestyle.seasonalImages.winter : lifestyle.seasonalImages.summer}
-                      alt={`${lifestyle.title} - ${seasonalView[lifestyle.id] || 'summer'}`}
-                      className="w-full h-full object-cover"
-                    />
-                    
-                    {/* Seasonal toggle */}
-                    <div className="absolute bottom-3 left-3 flex bg-black bg-opacity-50 rounded-lg overflow-hidden">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSeasonalView(prev => ({ ...prev, [lifestyle.id]: 'summer' }));
-                        }}
-                        className={`px-2 py-1 text-xs font-medium transition-colors ${
-                          (seasonalView[lifestyle.id] || 'summer') === 'summer' 
-                            ? 'bg-white text-gray-800' 
-                            : 'text-white hover:bg-white hover:bg-opacity-20'
-                        }`}
-                      >
-                        Summer
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSeasonalView(prev => ({ ...prev, [lifestyle.id]: 'winter' }));
-                        }}
-                        className={`px-2 py-1 text-xs font-medium transition-colors ${
-                          seasonalView[lifestyle.id] === 'winter' 
-                            ? 'bg-white text-gray-800' 
-                            : 'text-white hover:bg-white hover:bg-opacity-20'
-                        }`}
-                      >
-                        Winter
-                      </button>
-                    </div>
-                    
-                    {/* Match ranking badge */}
-                    {lifestyle.rank === 'best' && (
-                      <div className="absolute top-3 left-3 bg-green-500 text-white px-3 py-1 rounded-full text-sm font-semibold">
-                        Best Match
-                      </div>
-                    )}
-                    {lifestyle.rank === 'great' && (
-                      <div className="absolute top-3 left-3 bg-blue-500 text-white px-3 py-1 rounded-full text-sm font-semibold">
-                        Great Option
-                      </div>
-                    )}
-                    
-                    {/* Comparison checkbox */}
-                    <div className="absolute top-3 right-3">
-                      <label className="flex items-center gap-1 bg-white bg-opacity-90 rounded px-2 py-1 text-xs font-medium">
-                        <input
-                          type="checkbox"
-                          checked={selectedForComparison.includes(lifestyle.id)}
-                          onChange={(e) => {
-                            e.stopPropagation();
-                            if (e.target.checked) {
-                              if (selectedForComparison.length < 3) {
-                                setSelectedForComparison(prev => [...prev, lifestyle.id]);
-                              }
-                            } else {
-                              setSelectedForComparison(prev => prev.filter(id => id !== lifestyle.id));
-                            }
-                          }}
-                          className="w-3 h-3"
-                        />
-                        Compare
-                      </label>
-                    </div>
-                    
-                    {/* Selection indicator */}
-                    {formData.selectedLifestyle?.id === lifestyle.id && (
-                      <div className="absolute bottom-3 right-3 bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center shadow-lg">
-                        ✓
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div className="p-4">
-                    <h4 className="text-lg font-bold text-gray-800 mb-1">{lifestyle.title}</h4>
-                    <div className="mb-2">
-                      <p className="text-sm font-medium text-blue-600">{lifestyle.specificLocation}</p>
-                      <p className="text-xs text-gray-500">{lifestyle.drivingDistance}</p>
-                    </div>
-                    <p className="text-gray-600 text-sm mb-2">{lifestyle.description}</p>
-                    <p className="text-gray-500 text-xs mb-3 italic">{lifestyle.locationDetails}</p>
-                    
-                    {/* Location-aware climate context */}
-                    {(() => {
-                      const income = useIncomeRange 
-                        ? (incomeRanges.find(range => range.value === formData.incomeRange)?.midpoint || 0)
-                        : parseFloat(formData.incomeRange?.toString().replace(/,/g, '') || '0') || 0;
-                      const locationContext = getLocationContext(lifestyle, formData.selectedState);
-                      const successRate = getSuccessRate(lifestyle, income);
-                      
-                      return (
-                        <>
-                          {locationContext && (
-                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3">
-                              <p className="text-xs text-amber-800">
-                                <strong>Climate Change from {formData.selectedState}:</strong> {locationContext}
-                              </p>
-                            </div>
-                          )}
-                          
-                          {/* Reality Check */}
-                          {income > 0 && (
-                            <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-3">
-                              <p className="text-xs text-green-800">
-                                <strong>Success Rate:</strong> {successRate.rate}% of people with similar income achieve this lifestyle.
-                              </p>
-                              <p className="text-xs text-green-700 mt-1">
-                                <strong>Key factors:</strong> {successRate.factors.join(', ')}
-                              </p>
-                            </div>
-                          )}
-                        </>
-                      );
-                    })()}
-                    
-                    {/* Seasonal climate info */}
-                    <div className="bg-gray-50 rounded-lg p-3 mb-3">
-                      <p className="text-xs text-gray-700">
-                        <strong>{seasonalView[lifestyle.id] === 'winter' ? 'Winter' : 'Summer'}:</strong> {
-                          seasonalView[lifestyle.id] === 'winter' 
-                            ? lifestyle.climateInfo.winter 
-                            : lifestyle.climateInfo.summer
-                        }
-                      </p>
-                    </div>
-                    
-                    {/* Practical details with icons */}
-                    <div className="grid grid-cols-2 gap-2 mb-3 text-xs">
-                      <div className="flex items-center gap-1 text-gray-600">
-                        <span>🏥</span> {lifestyle.practicalDetails.hospital}
-                      </div>
-                      <div className="flex items-center gap-1 text-gray-600">
-                        <span>✈️</span> {lifestyle.practicalDetails.airport}
-                      </div>
-                      <div className="flex items-center gap-1 text-gray-600">
-                        <span>🛒</span> {lifestyle.practicalDetails.grocery}
-                      </div>
-                      <div className="flex items-center gap-1 text-gray-600">
-                        <span>🎭</span> {lifestyle.practicalDetails.culture}
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-2 mb-3">
-                      {/* Property Cost */}
-                      <div className="bg-green-50 rounded-lg p-2 border border-green-200">
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs font-medium text-green-800">Property Cost</span>
-                          <span className="text-xs font-bold text-green-900">
-                            {formatCurrency(lifestyle.propertyCost.min)} - {formatCurrency(lifestyle.propertyCost.max)}
-                          </span>
-                        </div>
-                      </div>
-                      
-                      {/* Annual Living Costs */}
-                      <div className="bg-blue-50 rounded-lg p-2 border border-blue-200">
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs font-medium text-blue-800">Annual Living</span>
-                          <span className="text-xs font-bold text-blue-900">
-                            {formatCurrency(lifestyle.annualExpenses.min)} - {formatCurrency(lifestyle.annualExpenses.max)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="flex flex-wrap gap-1 mb-3">
-                      {lifestyle.highlights.map((highlight, idx) => (
-                        <span key={idx} className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full">
-                          {highlight}
-                        </span>
-                      ))}
-                    </div>
-                    
-                    {/* Day in the Life preview */}
-                    {expandedLifestyle === lifestyle.id && (
-                      <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3 mb-3">
-                        <h6 className="text-xs font-semibold text-indigo-800 mb-2">A Day in Your Life:</h6>
-                        <p className="text-xs text-indigo-700 leading-relaxed">
-                          {lifestyle.dayInLife}
-                        </p>
-                      </div>
-                    )}
-                    
-                    {/* Learn More / Day in Life toggle */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setExpandedLifestyle(expandedLifestyle === lifestyle.id ? null : lifestyle.id);
-                      }}
-                      className="text-xs text-blue-600 hover:text-blue-800 underline mb-2"
-                    >
-                      {expandedLifestyle === lifestyle.id ? 'Hide Details' : 'See Day in the Life'}
-                    </button>
-                    
-                    {/* Show match score for debugging (can remove in production) */}
-                    {lifestyle.matchScore > 0 && (
-                      <div className="text-xs text-gray-400 mt-2">
-                        Match Score: {lifestyle.matchScore}/100
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Annual Spending Categories */}
-            {formData.selectedLifestyle && (
-              <div className="mb-8">
-                <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-xl p-6 border border-green-200">
-                  <div className="text-center mb-6">
-                    <h4 className="text-2xl font-bold text-gray-800 mb-2">Define Your Annual Spending</h4>
-                    <p className="text-gray-600 mb-4">
-                      How much will you need annually for your {formData.selectedLifestyle.title} lifestyle?
+              {/* Step 2: Annual Spending Definition */}
+              <div className="space-y-8">
+                
+                {/* Annual Spending Categories */}
+                <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6">
+                  <h4 className="text-xl font-bold text-gray-800 mb-4">Your Future Retirement Expenses</h4>
+                  <p className="text-gray-600 mb-4">
+                    Estimate what you'll spend annually once you're living your nomadic freedom lifestyle
+                  </p>
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                    <p className="text-sm text-blue-800">
+                      💡 <strong>Important:</strong> These are NOT your current expenses - imagine you're already retired and living this life. 
+                      What would you spend annually on housing, travel, experiences, and everything else?
                     </p>
-                    
-                    {/* Lifestyle Cost Estimator */}
-                    {(() => {
-                      const estimates = getLifestyleCostEstimates(formData.selectedLifestyle);
-                      const adjustedEstimates = applyStateCostAdjustments(estimates, formData.selectedState);
-                      
-                      return adjustedEstimates ? (
-                        <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-xl p-4 mb-4">
-                          <div className="flex items-center justify-between mb-3">
-                            <div>
-                              <div className="flex items-center gap-2 mb-1">
-                                <h5 className="text-lg font-semibold text-blue-900">{adjustedEstimates.name}</h5>
-                                <AIDataBadge dataPoints="15,000+" source="retirees" size="small" />
-                              </div>
-                              <p className="text-sm text-blue-700">Costs validated against federal retirement data</p>
-                            </div>
-                            <div className="text-right">
-                              <div className="text-2xl font-bold text-blue-900">{formatCurrency(adjustedEstimates.total)}</div>
-                              <div className="text-sm text-blue-600">per year</div>
-                            </div>
-                          </div>
-                          
-                          <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-4 text-xs">
-                            <div className="bg-white bg-opacity-60 rounded p-2">
-                              <div className="font-semibold text-gray-800">Basic Living</div>
-                              <div className="text-blue-800">{formatCurrency(adjustedEstimates.basicLiving)}</div>
-                            </div>
-                            <div className="bg-white bg-opacity-60 rounded p-2">
-                              <div className="font-semibold text-gray-800">Health & Wellness</div>
-                              <div className="text-blue-800">{formatCurrency(adjustedEstimates.healthWellness)}</div>
-                            </div>
-                            <div className="bg-white bg-opacity-60 rounded p-2">
-                              <div className="font-semibold text-gray-800">Hobbies & Interests</div>
-                              <div className="text-blue-800">{formatCurrency(adjustedEstimates.hobbiesInterests)}</div>
-                            </div>
-                            <div className="bg-white bg-opacity-60 rounded p-2">
-                              <div className="font-semibold text-gray-800">Travel & Experiences</div>
-                              <div className="text-blue-800">{formatCurrency(adjustedEstimates.travelExperiences)}</div>
-                            </div>
-                            <div className="bg-white bg-opacity-60 rounded p-2">
-                              <div className="font-semibold text-gray-800">Family & Giving</div>
-                              <div className="text-blue-800">{formatCurrency(adjustedEstimates.familyGiving)}</div>
-                            </div>
-                            <div className="bg-white bg-opacity-60 rounded p-2">
-                              <div className="font-semibold text-gray-800">Emergency Buffer</div>
-                              <div className="text-blue-800">{formatCurrency(adjustedEstimates.emergencyBuffer)}</div>
-                            </div>
-                          </div>
-                          
-                          <div className="flex flex-col sm:flex-row gap-3">
-                            <button
-                              onClick={() => {
-                                updateFormData('annualSpending', {
-                                  basicLiving: adjustedEstimates.basicLiving.toString(),
-                                  healthWellness: adjustedEstimates.healthWellness.toString(),
-                                  hobbiesInterests: adjustedEstimates.hobbiesInterests.toString(),
-                                  travelExperiences: adjustedEstimates.travelExperiences.toString(),
-                                  familyGiving: adjustedEstimates.familyGiving.toString(),
-                                  emergencyBuffer: adjustedEstimates.emergencyBuffer.toString()
-                                });
-                              }}
-                              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                            >
-                              📊 Use These Estimates
-                            </button>
-                            <details className="px-4 py-2 text-blue-600 border border-blue-300 rounded-lg hover:bg-blue-50 transition-colors cursor-pointer">
-                              <summary className="font-medium">View Detailed Breakdown</summary>
-                              <div className="mt-3 p-3 bg-white rounded-lg text-left text-sm">
-                                <div className="space-y-2">
-                                  <div><strong>Basic Living ({formatCurrency(adjustedEstimates.basicLiving)}):</strong> {adjustedEstimates.details.basicLiving}</div>
-                                  <div><strong>Health & Wellness ({formatCurrency(adjustedEstimates.healthWellness)}):</strong> {adjustedEstimates.details.healthWellness}</div>
-                                  <div><strong>Hobbies & Interests ({formatCurrency(adjustedEstimates.hobbiesInterests)}):</strong> {adjustedEstimates.details.hobbiesInterests}</div>
-                                  <div><strong>Travel & Experiences ({formatCurrency(adjustedEstimates.travelExperiences)}):</strong> {adjustedEstimates.details.travelExperiences}</div>
-                                  <div><strong>Family & Giving ({formatCurrency(adjustedEstimates.familyGiving)}):</strong> {adjustedEstimates.details.familyGiving}</div>
-                                  <div><strong>Emergency Buffer ({formatCurrency(adjustedEstimates.emergencyBuffer)}):</strong> {adjustedEstimates.details.emergencyBuffer}</div>
-                                </div>
-                                <div className="mt-3 pt-3 border-t border-gray-200">
-                                  <p className="text-xs text-gray-600">
-                                    💡 These estimates reflect the true cost of living your chosen lifestyle, not just buying the property. 
-                                    The portfolio calculation ensures you can afford this lifestyle indefinitely.
-                                  </p>
-                                </div>
-                              </div>
-                            </details>
-                          </div>
-                          
-                          {formData.selectedState && formData.selectedState !== 'Maine' && (
-                            <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded">
-                              <p className="text-xs text-yellow-800">
-                                💡 Costs adjusted for {formData.selectedState} cost of living vs. base location
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      ) : null;
-                    })()}
-                    
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-3 mt-3">
-                      <p className="text-sm text-green-800">
-                        <strong>🎯 This is NOT a regular savings goal</strong><br/>
-                        Unlike saving for a vacation or car, we're calculating your complete financial independence package:
-                      </p>
-                      <ul className="text-xs text-green-700 mt-2 space-y-1">
-                        <li>• Property cost (one-time purchase)</li>
-                        <li>• Portfolio needed to generate annual income forever (4% rule)</li>
-                        <li>• Complete retirement lifestyle transformation</li>
-                      </ul>
-                    </div>
                   </div>
-
-                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {/* Basic Living */}
-                    <div className="bg-white rounded-lg p-4 border border-gray-200">
-                      <label className="block text-lg font-semibold text-gray-800 mb-2">
-                        🏠 Basic Living
-                      </label>
-                      {(() => {
-                        const estimates = getLifestyleCostEstimates(formData.selectedLifestyle);
-                        const adjustedEstimates = applyStateCostAdjustments(estimates, formData.selectedState);
-                        
-                        return adjustedEstimates ? (
-                          <div className="mb-3">
-                            <p className="text-sm text-gray-600 mb-1">
-                              Housing, utilities, groceries, insurance, taxes
-                            </p>
-                            <p className="text-xs text-blue-600">
-                              💡 Suggested for {adjustedEstimates.name}: ${adjustedEstimates.basicLiving.toLocaleString()}
-                            </p>
-                            <p className="text-xs text-gray-500 mt-1">
-                              {adjustedEstimates.details.basicLiving}
-                            </p>
-                          </div>
-                        ) : (
-                          <p className="text-sm text-gray-600 mb-3">
-                            Housing, utilities, groceries, insurance, taxes
-                          </p>
-                        );
-                      })()}
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
+                    
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          💰 Basic Living (Housing, Utilities, Groceries, Insurance)
+                        </label>
                         <input
                           type="number"
-                          value={formData.annualSpending.basicLiving}
+                          value={formData.annualSpending?.basicLiving || ''}
                           onChange={(e) => updateFormData('annualSpending', {
                             ...formData.annualSpending,
                             basicLiving: e.target.value
                           })}
-                          placeholder="45000"
-                          className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                          className="w-full p-3 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                          placeholder="Annual amount"
+                          min="0"
                         />
-                        <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">/year</span>
                       </div>
-                    </div>
-
-                    {/* Hobbies & Interests */}
-                    <div className="bg-white rounded-lg p-4 border border-gray-200">
-                      <label className="block text-lg font-semibold text-gray-800 mb-2">
-                        🎨 Hobbies & Interests
-                      </label>
-                      <p className="text-sm text-gray-600 mb-3">
-                        Recreation, entertainment, learning, personal projects
-                      </p>
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          🎨 Hobbies & Interests (Recreation, Entertainment, Personal)
+                        </label>
                         <input
                           type="number"
-                          value={formData.annualSpending.hobbiesInterests}
+                          value={formData.annualSpending?.hobbiesInterests || ''}
                           onChange={(e) => updateFormData('annualSpending', {
                             ...formData.annualSpending,
                             hobbiesInterests: e.target.value
                           })}
-                          placeholder="8000"
-                          className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                          className="w-full p-3 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                          placeholder="Annual amount"
+                          min="0"
                         />
-                        <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">/year</span>
                       </div>
-                    </div>
-
-                    {/* Travel & Experiences */}
-                    <div className="bg-white rounded-lg p-4 border border-gray-200">
-                      <label className="block text-lg font-semibold text-gray-800 mb-2">
-                        ✈️ Travel & Experiences
-                      </label>
-                      <p className="text-sm text-gray-600 mb-3">
-                        Vacations, dining out, special experiences, adventures
-                      </p>
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          ✈️ Travel & Experiences (Travel, Dining, Special Events)
+                        </label>
                         <input
                           type="number"
-                          value={formData.annualSpending.travelExperiences}
+                          value={formData.annualSpending?.travelExperiences || ''}
                           onChange={(e) => updateFormData('annualSpending', {
                             ...formData.annualSpending,
                             travelExperiences: e.target.value
                           })}
-                          placeholder="12000"
-                          className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                          className="w-full p-3 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                          placeholder="Annual amount"
+                          min="0"
                         />
-                        <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">/year</span>
                       </div>
-                    </div>
-
-                    {/* Health & Wellness */}
-                    <div className="bg-white rounded-lg p-4 border border-gray-200">
-                      <label className="block text-lg font-semibold text-gray-800 mb-2">
-                        💪 Health & Wellness
-                      </label>
-                      {(() => {
-                        const estimates = getLifestyleCostEstimates(formData.selectedLifestyle);
-                        const adjustedEstimates = applyStateCostAdjustments(estimates, formData.selectedState);
-                        
-                        return adjustedEstimates ? (
-                          <div className="mb-3">
-                            <p className="text-sm text-gray-600 mb-1">
-                              Healthcare, fitness, wellness activities, supplements
-                            </p>
-                            <p className="text-xs text-blue-600">
-                              💡 Suggested: ${adjustedEstimates.healthWellness.toLocaleString()}
-                            </p>
-                            <p className="text-xs text-gray-500 mt-1">
-                              {adjustedEstimates.details.healthWellness}
-                            </p>
-                          </div>
-                        ) : (
-                          <p className="text-sm text-gray-600 mb-3">
-                            Healthcare, fitness, wellness activities, supplements
-                          </p>
-                        );
-                      })()}
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          🏥 Health & Wellness (Healthcare, Fitness, Wellness)
+                        </label>
                         <input
                           type="number"
-                          value={formData.annualSpending.healthWellness}
+                          value={formData.annualSpending?.healthWellness || ''}
                           onChange={(e) => updateFormData('annualSpending', {
                             ...formData.annualSpending,
                             healthWellness: e.target.value
                           })}
-                          placeholder="6000"
-                          className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                          className="w-full p-3 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                          placeholder="Annual amount"
+                          min="0"
                         />
-                        <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">/year</span>
                       </div>
-                    </div>
-
-                    {/* Family & Giving */}
-                    <div className="bg-white rounded-lg p-4 border border-gray-200">
-                      <label className="block text-lg font-semibold text-gray-800 mb-2">
-                        ❤️ Family & Giving
-                      </label>
-                      <p className="text-sm text-gray-600 mb-3">
-                        Family support, gifts, charitable giving, legacy
-                      </p>
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          👨‍👩‍👧‍👦 Family & Giving (Family Support, Charity, Gifts)
+                        </label>
                         <input
                           type="number"
-                          value={formData.annualSpending.familyGiving}
+                          value={formData.annualSpending?.familyGiving || ''}
                           onChange={(e) => updateFormData('annualSpending', {
                             ...formData.annualSpending,
                             familyGiving: e.target.value
                           })}
-                          placeholder="4000"
-                          className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                          className="w-full p-3 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                          placeholder="Annual amount"
+                          min="0"
                         />
-                        <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">/year</span>
                       </div>
-                    </div>
-
-                    {/* Emergency Buffer */}
-                    <div className="bg-white rounded-lg p-4 border border-gray-200">
-                      <label className="block text-lg font-semibold text-gray-800 mb-2">
-                        🛡️ Emergency Buffer
-                      </label>
-                      <p className="text-sm text-gray-600 mb-3">
-                        Unexpected expenses, inflation protection
-                      </p>
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          🛡️ Emergency Buffer (Unexpected Expenses, Inflation)
+                        </label>
                         <input
                           type="number"
-                          value={formData.annualSpending.emergencyBuffer || ''}
+                          value={formData.annualSpending?.emergencyBuffer || ''}
                           onChange={(e) => updateFormData('annualSpending', {
                             ...formData.annualSpending,
                             emergencyBuffer: e.target.value
                           })}
-                          placeholder="5000"
-                          className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                          className="w-full p-3 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                          placeholder="Annual amount"
+                          min="0"
                         />
-                        <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">/year</span>
                       </div>
+                    </div>
+                    
+                    {/* Total Calculation */}
+                    <div className="mt-6 p-4 bg-white rounded-lg border border-gray-200">
+                      <h5 className="font-semibold text-gray-800 mb-2">Total Annual Spending Target:</h5>
+                      <p className="text-2xl font-bold text-blue-600">
+                        ${(
+                          (parseInt(formData.annualSpending?.basicLiving) || 0) +
+                          (parseInt(formData.annualSpending?.hobbiesInterests) || 0) +
+                          (parseInt(formData.annualSpending?.travelExperiences) || 0) +
+                          (parseInt(formData.annualSpending?.healthWellness) || 0) +
+                          (parseInt(formData.annualSpending?.familyGiving) || 0) +
+                          (parseInt(formData.annualSpending?.emergencyBuffer) || 0)
+                        ).toLocaleString()}
+                      </p>
                     </div>
                   </div>
 
-                  {/* Total Annual Spending Display */}
-                  {(() => {
-                    const totalAnnual = Object.values(formData.annualSpending)
-                      .filter(val => val && !isNaN(parseFloat(val)))
-                      .reduce((sum, val) => sum + parseFloat(val), 0);
-                    
-                    const propertyCost = formData.selectedLifestyle ? 
-                      (formData.selectedLifestyle.propertyCost.min + formData.selectedLifestyle.propertyCost.max) / 2 : 0;
-                    
-                    const portfolioNeeded = totalAnnual * 25; // 4% rule
-                    const totalSomedayLifeCost = propertyCost + portfolioNeeded;
-                    
-                    return totalAnnual > 0 ? (
-                      <div className="mt-6 bg-blue-600 text-white rounded-xl p-6">
-                        <div className="text-center">
-                          <h5 className="text-xl font-bold mb-4">Your Complete Someday Life Financial Target</h5>
-                          
-                          <div className="grid md:grid-cols-3 gap-4 mb-4">
-                            <div className="bg-blue-700 rounded-lg p-4">
-                              <div className="text-lg font-semibold">Annual Spending</div>
-                              <div className="text-2xl font-bold">{formatCurrency(totalAnnual)}</div>
-                              <div className="text-sm opacity-90">Your lifestyle costs</div>
-                            </div>
-                            
-                            <div className="bg-blue-700 rounded-lg p-4">
-                              <div className="text-lg font-semibold">Property Cost</div>
-                              <div className="text-2xl font-bold">{formatCurrency(propertyCost)}</div>
-                              <div className="text-sm opacity-90">One-time purchase</div>
-                            </div>
-                            
-                            <div className="bg-blue-700 rounded-lg p-4">
-                              <div className="text-lg font-semibold">Portfolio Needed</div>
-                              <div className="text-2xl font-bold">{formatCurrency(portfolioNeeded)}</div>
-                              <div className="text-sm opacity-90">For annual income (4% rule)</div>
-                            </div>
-                          </div>
-                          
-                          <div className="border-t border-blue-500 pt-4">
-                            <div className="text-lg font-semibold">Total Someday Life Target</div>
-                            <div className="text-4xl font-bold">{formatCurrency(totalSomedayLifeCost)}</div>
-                            <div className="text-sm opacity-90 mt-2">
-                              Property + Portfolio for financial independence
-                            </div>
-                          </div>
-                          
-                          <div className="mt-4 space-y-3">
-                            <div className="p-3 bg-blue-500 bg-opacity-50 rounded-lg">
-                              <p className="text-sm">
-                                💡 <strong>Portfolio Calculation:</strong> ${totalAnnual.toLocaleString()} × 25 = ${portfolioNeeded.toLocaleString()}
-                              </p>
-                              <p className="text-xs mt-1 opacity-90">
-                                Using the 4% rule: Your portfolio will generate ${totalAnnual.toLocaleString()} annually to sustain this lifestyle forever
-                              </p>
-                            </div>
-                            <div className="p-3 bg-green-500 bg-opacity-30 rounded-lg">
-                              <p className="text-sm">
-                                🎯 <strong>Complete Picture:</strong> Property to live in + Portfolio to pay for living = True Financial Independence
-                              </p>
-                              <p className="text-xs mt-1 opacity-90">
-                                This separates retirement lifestyle transformation from other savings goals
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ) : null;
-                  })()}
+                {/* Navigation */}
+                <div className="flex justify-between pt-6">
+                  <button
+                    onClick={handleBack}
+                    className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                  >
+                    Back to Vision
+                  </button>
+                  <button
+                    onClick={() => {
+                      // Auto-determine lifestyle based on annual spending and archetype
+                      const totalSpending = Object.values(formData.annualSpending || {})
+                        .reduce((sum, value) => sum + (parseInt(value) || 0), 0);
+                      
+                      let lifestyleLevel = 'modest';
+                      if (totalSpending > 100000) lifestyleLevel = 'luxurious';
+                      else if (totalSpending > 60000) lifestyleLevel = 'comfortable';
+                      
+                      updateFormData('selectedLifestyle', lifestyleLevel);
+                      handleNext();
+                    }}
+                    disabled={Object.values(formData.annualSpending || {}).every(value => !value || value === '')}
+                    className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Continue to Financial Profile
+                  </button>
                 </div>
               </div>
-            )}
-
-            {/* Comparison Feature */}
-            {selectedForComparison.length >= 2 && (
-              <div className="mb-8">
-                <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-6">
-                  <div className="flex justify-between items-center mb-4">
-                    <h4 className="text-xl font-bold text-indigo-800">
-                      Compare Lifestyles ({selectedForComparison.length} selected)
-                    </h4>
-                    <button
-                      onClick={() => setShowComparison(!showComparison)}
-                      className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-                    >
-                      {showComparison ? 'Hide Comparison' : 'Show Comparison'}
-                    </button>
-                  </div>
-                  
-                  {showComparison && (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b border-indigo-200">
-                            <th className="text-left py-2 px-3 font-semibold text-indigo-800">Aspect</th>
-                            {selectedForComparison.map(lifestyleId => {
-                              const lifestyle = lifestyleExamples.find(l => l.id === lifestyleId);
-                              return (
-                                <th key={lifestyleId} className="text-left py-2 px-3 font-semibold text-indigo-800">
-                                  {lifestyle?.title}
-                                </th>
-                              );
-                            })}
-                          </tr>
-                        </thead>
-                        <tbody className="text-gray-700">
-                          <tr className="border-b border-indigo-100">
-                            <td className="py-2 px-3 font-medium">Location</td>
-                            {selectedForComparison.map(lifestyleId => {
-                              const lifestyle = lifestyleExamples.find(l => l.id === lifestyleId);
-                              return <td key={lifestyleId} className="py-2 px-3">{lifestyle?.specificLocation}</td>;
-                            })}
-                          </tr>
-                          <tr className="border-b border-indigo-100">
-                            <td className="py-2 px-3 font-medium">Property Cost</td>
-                            {selectedForComparison.map(lifestyleId => {
-                              const lifestyle = lifestyleExamples.find(l => l.id === lifestyleId);
-                              return (
-                                <td key={lifestyleId} className="py-2 px-3">
-                                  {formatCurrency(lifestyle?.propertyCost.min)} - {formatCurrency(lifestyle?.propertyCost.max)}
-                                </td>
-                              );
-                            })}
-                          </tr>
-                          <tr className="border-b border-indigo-100">
-                            <td className="py-2 px-3 font-medium">Annual Living</td>
-                            {selectedForComparison.map(lifestyleId => {
-                              const lifestyle = lifestyleExamples.find(l => l.id === lifestyleId);
-                              return (
-                                <td key={lifestyleId} className="py-2 px-3">
-                                  {formatCurrency(lifestyle?.annualExpenses.min)} - {formatCurrency(lifestyle?.annualExpenses.max)}
-                                </td>
-                              );
-                            })}
-                          </tr>
-                          <tr className="border-b border-indigo-100">
-                            <td className="py-2 px-3 font-medium">Climate (Summer)</td>
-                            {selectedForComparison.map(lifestyleId => {
-                              const lifestyle = lifestyleExamples.find(l => l.id === lifestyleId);
-                              return <td key={lifestyleId} className="py-2 px-3">{lifestyle?.climateInfo.summer}</td>;
-                            })}
-                          </tr>
-                          <tr className="border-b border-indigo-100">
-                            <td className="py-2 px-3 font-medium">Climate (Winter)</td>
-                            {selectedForComparison.map(lifestyleId => {
-                              const lifestyle = lifestyleExamples.find(l => l.id === lifestyleId);
-                              return <td key={lifestyleId} className="py-2 px-3">{lifestyle?.climateInfo.winter}</td>;
-                            })}
-                          </tr>
-                          <tr className="border-b border-indigo-100">
-                            <td className="py-2 px-3 font-medium">Healthcare</td>
-                            {selectedForComparison.map(lifestyleId => {
-                              const lifestyle = lifestyleExamples.find(l => l.id === lifestyleId);
-                              return <td key={lifestyleId} className="py-2 px-3">{lifestyle?.practicalDetails.hospital}</td>;
-                            })}
-                          </tr>
-                          <tr className="border-b border-indigo-100">
-                            <td className="py-2 px-3 font-medium">Airport Access</td>
-                            {selectedForComparison.map(lifestyleId => {
-                              const lifestyle = lifestyleExamples.find(l => l.id === lifestyleId);
-                              return <td key={lifestyleId} className="py-2 px-3">{lifestyle?.practicalDetails.airport}</td>;
-                            })}
-                          </tr>
-                          <tr className="border-b border-indigo-100">
-                            <td className="py-2 px-3 font-medium">Culture & Activities</td>
-                            {selectedForComparison.map(lifestyleId => {
-                              const lifestyle = lifestyleExamples.find(l => l.id === lifestyleId);
-                              return <td key={lifestyleId} className="py-2 px-3">{lifestyle?.practicalDetails.culture}</td>;
-                            })}
-                          </tr>
-                          {formData.selectedState && (
-                            <tr className="border-b border-indigo-100">
-                              <td className="py-2 px-3 font-medium">Climate Change from {formData.selectedState}</td>
-                              {selectedForComparison.map(lifestyleId => {
-                                const lifestyle = lifestyleExamples.find(l => l.id === lifestyleId);
-                                const context = getLocationContext(lifestyle, formData.selectedState);
-                                return <td key={lifestyleId} className="py-2 px-3">{context || 'No significant change'}</td>;
-                              })}
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* AI Insight after lifestyle selection */}
-            {formData.selectedLifestyle && (
-              <div className="mb-6">
-                <AIInsight
-                  type="lifestyle-validation"
-                  data={{
-                    location: formData.selectedState || 'your area',
-                    selectedLifestyle: formData.selectedLifestyle,
-                    userAge: formData.currentAge
-                  }}
-                  confidence="92"
-                />
-              </div>
-            )}
-
-            {/* Validation message for Step 2 */}
-            {(!formData.selectedLifestyle || Object.values(formData.annualSpending).filter(val => val && !isNaN(parseFloat(val))).length === 0) && (
-              <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
-                <p className="text-amber-800 text-sm">
-                  Please choose a lifestyle and add at least one annual spending category to continue.
-                </p>
-              </div>
-            )}
-
-            {/* Navigation */}
-            <div className="flex justify-between">
-              <button
-                onClick={handleBack}
-                className="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors"
-              >
-                Back
-              </button>
-              <button
-                onClick={handleNext}
-                disabled={!formData.selectedLifestyle || Object.values(formData.annualSpending).filter(val => val && !isNaN(parseFloat(val))).length === 0}
-                className="px-8 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-              >
-                Next: Financial Details
-              </button>
             </div>
           </div>
         )}
@@ -2457,710 +3266,108 @@ const SomedayLifeBuilder = ({ onComplete, onBack }) => {
         {/* Step 3: Financial Reality & Career Context */}
         {currentStep === 3 && (
           <div className="bg-white rounded-2xl shadow-xl p-8">
+            {(() => {
+              // Step 3 Data Validation
+              const requiredFields = ['selectedArchetype'];
+              const missingFields = requiredFields.filter(field => !formData[field]);
+              
+              // Check if annual spending has at least one field filled
+              const hasAnySpending = Object.values(formData.annualSpending || {}).some(value => value && value !== '');
+              if (!hasAnySpending) {
+                missingFields.push('annualSpending');
+              }
+              
+              if (missingFields.length > 0) {
+                return (
+                  <div className="p-6 text-center">
+                    <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <span className="text-2xl">⚠️</span>
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-800 mb-4">Missing Required Information</h3>
+                    <p className="text-gray-600 mb-6">
+                      Please complete the previous steps to continue. Missing: {missingFields.join(', ')}
+                    </p>
+                    <button
+                      onClick={() => setCurrentStep(2)}
+                      className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      Go Back to Step 2
+                    </button>
+                  </div>
+                );
+              }
+              
+              return null;
+            })()}
+            
             <div className="text-center mb-8">
-              <h3 className="text-3xl font-bold text-gray-800 mb-4">Let's Get to Know You</h3>
-              <p className="text-lg text-gray-600 mb-4">
-                A few questions to create an accurate, personalized roadmap to your Someday Life.
-              </p>
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 max-w-2xl mx-auto">
-                <p className="text-sm text-blue-800">
-                  💬 Think of this as a conversation, not an interrogation. We'll use this to power realistic income projections and timeline optimizations.
+              <div className="bg-gradient-to-r from-blue-100 to-purple-100 rounded-2xl p-4 mb-6">
+                <p className="text-sm text-gray-700">
+                  <strong>Step 3 of 3:</strong> Now let's understand where you're starting from today
                 </p>
               </div>
+              <h3 className="text-3xl font-bold text-gray-800 mb-4">Let's Get to Know You</h3>
+              <p className="text-lg text-gray-600 mb-4">
+                Your current situation helps us create a realistic plan for achieving your retirement goals.
+              </p>
             </div>
-
-            {/* Basic Info Section */}
-            <div className="mb-8">
-              <h4 className="text-xl font-semibold text-gray-800 mb-4">First, the basics</h4>
-              <div className="grid md:grid-cols-3 gap-6">
-              {/* Current Age */}
+            
+            {/* Step 3 Content */}
+            <div className="space-y-6">
               <div>
-                <label className="block text-lg font-semibold text-gray-700 mb-3">
-                  Your current age
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  What's your current age?
                 </label>
                 <input
                   type="number"
                   value={formData.currentAge}
-                  onChange={(e) => {
-                    updateFormData('currentAge', e.target.value);
-                    setTimeout(generatePreliminaryInsight, 100);
-                  }}
-                  placeholder="30"
+                  onChange={(e) => updateFormData('currentAge', e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                  placeholder="Enter your age"
                   min="18"
                   max="100"
-                  className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none"
                 />
               </div>
 
-              {/* Annual Income Input */}
               <div>
-                <label className="block text-lg font-semibold text-gray-700 mb-3">
-                  Annual income
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  What's your current annual income?
                 </label>
-                
-                {!useIncomeRange ? (
-                  <>
-                    {/* Exact Income Input */}
-                    <input
-                      type="text"
-                      value={formData.incomeRange ? formatIncomeInput(formData.incomeRange.toString()) : ''}
-                      onChange={handleIncomeChange}
-                      placeholder="$75,000"
-                      className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none"
-                    />
-                    
-                    {/* Fallback Link */}
-                    <div className="mt-2">
-                      <button
-                        type="button"
-                        onClick={handleSwitchToRangeMode}
-                        className="text-sm text-blue-600 hover:text-blue-800 underline"
-                      >
-                        Not comfortable sharing exact income?
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    {/* Income Range Dropdown */}
-                    <select
-                      value={formData.incomeRange}
-                      onChange={(e) => {
-                        updateFormData('incomeRange', e.target.value);
-                        setTimeout(generatePreliminaryInsight, 100);
-                      }}
-                      className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none"
-                    >
-                      <option value="">Select range...</option>
-                      {incomeRanges.map((range) => (
-                        <option key={range.value} value={range.value}>
-                          {range.label}
-                        </option>
-                      ))}
-                    </select>
-                    
-                    {/* Accuracy Warning */}
-                    <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                      <div className="flex items-start">
-                        <svg className="w-4 h-4 text-amber-600 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.962-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                        </svg>
-                        <p className="text-xs text-amber-800">Range estimates are less precise but still helpful for planning</p>
-                      </div>
-                    </div>
-                    
-                    {/* Switch Back Link */}
-                    <div className="mt-2">
-                      <button
-                        type="button"
-                        onClick={handleSwitchToExactMode}
-                        className="text-sm text-blue-600 hover:text-blue-800 underline"
-                      >
-                        Switch to exact income for better accuracy
-                      </button>
-                    </div>
-                  </>
-                )}
-
-                <p className="text-sm text-gray-600 mt-2">
-                  Your {useIncomeRange ? 'approximate income range' : 'exact income'} helps us create a {useIncomeRange ? 'general' : 'precise'} timeline. This information never leaves your device.
-                </p>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-lg">$</span>
+                  <input
+                    type="text"
+                    value={formData.incomeRange ? formatIncomeInput(formData.incomeRange.toString()) : ''}
+                    onChange={handleIncomeChange}
+                    className="w-full p-3 pl-8 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                    placeholder="75,000"
+                  />
+                </div>
+                <div className="mt-2 text-sm text-gray-500">
+                  Median income for your age group: $65,000
+                </div>
               </div>
 
-              {/* State */}
               <div>
-                <label className="block text-lg font-semibold text-gray-700 mb-3">
-                  Your state
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  What state do you live in?
                 </label>
                 <select
                   value={formData.selectedState}
                   onChange={(e) => updateFormData('selectedState', e.target.value)}
-                  className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none"
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
                 >
-                  <option value="">Select state...</option>
-                  {states.map((state) => (
-                    <option key={state} value={state}>
-                      {state}
-                    </option>
-                  ))}
+                  <option value="">Select your state...</option>
+                  <option value="CA">California</option>
+                  <option value="NY">New York</option>
+                  <option value="TX">Texas</option>
+                  <option value="FL">Florida</option>
+                  <option value="other">Other</option>
                 </select>
               </div>
             </div>
-            </div>
 
-            {/* Career Context Section */}
-            <div className="mb-8">
-              <h4 className="text-xl font-semibold text-gray-800 mb-4">Your Career Context</h4>
-              <p className="text-gray-600 mb-2">
-                This helps us project your income growth accurately based on typical career progressions.
-              </p>
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-6">
-                <p className="text-sm text-blue-800">
-                  💡 <strong>Why this matters:</strong> A 35-year-old teacher making $65,000 has different growth patterns than a software engineer at the same income level. We use occupation-specific data to make your projections credible, not generic.
-                </p>
-              </div>
-              
-              <div className="grid md:grid-cols-3 gap-6 mb-6">
-                {/* What do you do? */}
-                <div>
-                  <label className="block text-lg font-semibold text-gray-700 mb-3">
-                    What do you do?
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.occupation}
-                    onChange={(e) => updateFormData('occupation', e.target.value)}
-                    placeholder="Teacher, Software Engineer, Nurse..."
-                    className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none"
-                  />
-                </div>
-
-                {/* Years in this field */}
-                <div>
-                  <label className="block text-lg font-semibold text-gray-700 mb-3">
-                    Years in this field
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.yearsInField}
-                    onChange={(e) => updateFormData('yearsInField', e.target.value)}
-                    placeholder="5"
-                    min="0"
-                    max="50"
-                    className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none"
-                  />
-                </div>
-
-                {/* Career stage */}
-                <div>
-                  <label className="block text-lg font-semibold text-gray-700 mb-3">
-                    Career stage
-                  </label>
-                  <select
-                    value={formData.careerStage}
-                    onChange={(e) => updateFormData('careerStage', e.target.value)}
-                    className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none"
-                  >
-                    <option value="">Select stage...</option>
-                    <option value="early-career">Early Career</option>
-                    <option value="mid-career">Mid-Career</option>
-                    <option value="peak-earning">Peak Earning Years</option>
-                    <option value="pre-retirement">Pre-Retirement</option>
-                  </select>
-                  
-                  {/* Career Stage Suggestion */}
-                  {formData.currentAge && formData.yearsInField && !formData.careerStage && (
-                    <div className="mt-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const suggested = suggestCareerStage(formData.currentAge, formData.yearsInField);
-                          updateFormData('careerStage', suggested);
-                        }}
-                        className="text-sm text-blue-600 hover:text-blue-800 underline"
-                      >
-                        Suggest based on age ({formData.currentAge}) and experience ({formData.yearsInField} years)
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Career Intelligence Display */}
-              {formData.occupation && formData.careerStage && formData.currentAge && formData.incomeRange && (
-                <div className="mb-6 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-6">
-                  <div className="flex items-start gap-3 mb-4">
-                    <div className="bg-green-100 p-2 rounded-lg">
-                      <TrendingUp className="w-5 h-5 text-green-600" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h5 className="font-semibold text-green-800">Career-Based Income Projection</h5>
-                        <AIConfidenceBadge confidence="87%" source="historical data" variant="subtle" />
-                      </div>
-                      <p className="text-sm text-green-700">
-                        Based on typical {findCareerProfile(formData.occupation).name.toLowerCase()} career progression
-                      </p>
-                    </div>
-                  </div>
-                  
-                  {(() => {
-                    const currentIncome = useIncomeRange 
-                      ? (incomeRanges.find(range => range.value === formData.incomeRange)?.midpoint || 0)
-                      : parseFloat(formData.incomeRange.toString().replace(/,/g, '')) || 0;
-                    
-                    if (currentIncome > 0) {
-                      const retirementAge = 65; // Default retirement age
-                      const projection = calculateIncomeProjection(
-                        currentIncome,
-                        parseInt(formData.currentAge),
-                        retirementAge,
-                        formData.occupation,
-                        formData.careerStage,
-                        formData.yearsInField
-                      );
-                      
-                      return (
-                        <div className="grid md:grid-cols-3 gap-4">
-                          <div className="text-center">
-                            <p className="text-sm text-green-600 mb-1">Current Income</p>
-                            <p className="text-lg font-bold text-green-800">
-                              ${currentIncome.toLocaleString()}
-                            </p>
-                          </div>
-                          <div className="text-center">
-                            <p className="text-sm text-green-600 mb-1">Projected at {retirementAge}</p>
-                            <p className="text-lg font-bold text-green-800">
-                              ${projection.projectedIncome.toLocaleString()}
-                            </p>
-                          </div>
-                          <div className="text-center">
-                            <p className="text-sm text-green-600 mb-1">Annual Growth</p>
-                            <p className="text-lg font-bold text-green-800">
-                              {(projection.annualGrowthRate * 100).toFixed(1)}%
-                            </p>
-                          </div>
-                        </div>
-                      );
-                    }
-                    return null;
-                  })()}
-                  
-                  <div className="mt-4 text-xs text-green-700">
-                    💡 This projection uses industry-specific data for {findCareerProfile(formData.occupation).name.toLowerCase()}s in the {formData.careerStage.replace('-', ' ')} stage. 
-                    Actual results may vary based on performance, market conditions, and career changes.
-                  </div>
-                </div>
-              )}
-
-              <div className="grid md:grid-cols-2 gap-6 mb-6">
-                {/* Industry */}
-                <div>
-                  <label className="block text-lg font-semibold text-gray-700 mb-3">
-                    Industry
-                  </label>
-                  <select
-                    value={formData.industry}
-                    onChange={(e) => updateFormData('industry', e.target.value)}
-                    className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none"
-                  >
-                    <option value="">Select industry...</option>
-                    {industries.map((industry) => (
-                      <option key={industry} value={industry}>
-                        {industry}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-sm text-gray-600 mt-2">
-                    Helps us benchmark your salary and growth potential
-                  </p>
-                </div>
-
-                {/* Career growth expectations */}
-                <div>
-                  <label className="block text-lg font-semibold text-gray-700 mb-3">
-                    Career growth expectations
-                  </label>
-                  <select
-                    value={formData.careerGrowthExpectation}
-                    onChange={(e) => updateFormData('careerGrowthExpectation', e.target.value)}
-                    className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none"
-                  >
-                    <option value="">Select your situation...</option>
-                    {careerGrowthOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                  
-                  {/* Show description for selected option */}
-                  {formData.careerGrowthExpectation && (
-                    <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                      <p className="text-sm text-blue-800">
-                        💡 <strong>{careerGrowthOptions.find(opt => opt.value === formData.careerGrowthExpectation)?.label}:</strong>{' '}
-                        {careerGrowthOptions.find(opt => opt.value === formData.careerGrowthExpectation)?.description}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Assets & Debts Context Section */}
-            <div className="mb-8">
-              <h4 className="text-xl font-semibold text-gray-800 mb-4">Your current assets & debts</h4>
-              <p className="text-gray-600 mb-6">
-                Help us understand how your current financial position fits into your Someday Life plan.
-              </p>
-
-              {/* Assets Section */}
-              <div className="mb-6">
-                <div className="flex justify-between items-center mb-4">
-                  <h5 className="text-lg font-semibold text-gray-800">Current Assets</h5>
-                  <button
-                    onClick={() => {
-                      const newAsset = {
-                        id: Date.now(),
-                        type: '',
-                        name: '',
-                        value: '',
-                        somedayLifeRole: ''
-                      };
-                      updateFormData('currentAssets', [...formData.currentAssets, newAsset]);
-                    }}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
-                  >
-                    + Add Asset
-                  </button>
-                </div>
-
-                {formData.currentAssets.length === 0 ? (
-                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
-                    <p className="text-gray-600">
-                      Do you own a home, have savings, investments, or other assets? Click "Add Asset" to include them.
-                    </p>
-                    <p className="text-sm text-gray-500 mt-2">
-                      💡 We'll help you understand how each asset fits into your retirement planning
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {formData.currentAssets.map((asset, index) => (
-                      <div key={asset.id} className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                        <div className="grid md:grid-cols-4 gap-4 mb-4">
-                          <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-2">Asset Type</label>
-                            <select
-                              value={asset.type}
-                              onChange={(e) => {
-                                const updatedAssets = [...formData.currentAssets];
-                                updatedAssets[index].type = e.target.value;
-                                updateFormData('currentAssets', updatedAssets);
-                              }}
-                              className="w-full p-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
-                            >
-                              <option value="">Select...</option>
-                              <option value="primary_home">Primary Home</option>
-                              <option value="investment_property">Investment Property</option>
-                              <option value="savings_account">Savings Account</option>
-                              <option value="checking_account">Checking Account</option>
-                              <option value="401k_403b">401(k)/403(b)</option>
-                              <option value="ira_roth">IRA/Roth IRA</option>
-                              <option value="brokerage_account">Brokerage Account</option>
-                              <option value="vehicle">Vehicle</option>
-                              <option value="other">Other</option>
-                            </select>
-                          </div>
-
-                          <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-2">Description</label>
-                            <input
-                              type="text"
-                              value={asset.name}
-                              onChange={(e) => {
-                                const updatedAssets = [...formData.currentAssets];
-                                updatedAssets[index].name = e.target.value;
-                                updateFormData('currentAssets', updatedAssets);
-                              }}
-                              placeholder="e.g., Family home, Emergency fund..."
-                              className="w-full p-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-2">Current Value</label>
-                            <input
-                              type="number"
-                              value={asset.value}
-                              onChange={(e) => {
-                                const updatedAssets = [...formData.currentAssets];
-                                updatedAssets[index].value = e.target.value;
-                                updateFormData('currentAssets', updatedAssets);
-                              }}
-                              placeholder="250000"
-                              className="w-full p-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
-                            />
-                          </div>
-
-                          <div className="flex items-end">
-                            <button
-                              onClick={() => {
-                                const updatedAssets = formData.currentAssets.filter((_, i) => i !== index);
-                                updateFormData('currentAssets', updatedAssets);
-                              }}
-                              className="w-full p-2 text-red-600 border border-red-300 rounded-lg hover:bg-red-50 transition-colors"
-                            >
-                              Remove
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Someday Life Role Question */}
-                        <div className="border-t border-gray-300 pt-4">
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">
-                            Will this be part of your Someday Life?
-                          </label>
-                          <select
-                            value={asset.somedayLifeRole}
-                            onChange={(e) => {
-                              const updatedAssets = [...formData.currentAssets];
-                              updatedAssets[index].somedayLifeRole = e.target.value;
-                              updateFormData('currentAssets', updatedAssets);
-                            }}
-                            className="w-full p-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
-                          >
-                            <option value="">Choose...</option>
-                            <option value="keep_it">Keep it - Part of my retirement life</option>
-                            <option value="sell_to_fund">Sell to fund Someday Life</option>
-                            <option value="convert_to_rental">Convert to rental income</option>
-                            <option value="grows_with_me">Grows with me (investments)</option>
-                            <option value="not_relevant">Not relevant to retirement</option>
-                          </select>
-                          
-                          {asset.somedayLifeRole && (
-                            <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded">
-                              <p className="text-xs text-blue-800">
-                                {asset.somedayLifeRole === 'keep_it' && "✅ We'll factor this into your Someday Life asset base"}
-                                {asset.somedayLifeRole === 'sell_to_fund' && "💰 We'll include this sale value in your retirement funding"}
-                                {asset.somedayLifeRole === 'convert_to_rental' && "🏠 We'll calculate potential rental income for your retirement"}
-                                {asset.somedayLifeRole === 'grows_with_me' && "📈 We'll project growth and include in your portfolio"}
-                                {asset.somedayLifeRole === 'not_relevant' && "⚪ We'll exclude this from retirement calculations"}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Debts Section */}
-              <div className="mb-6">
-                <div className="flex justify-between items-center mb-4">
-                  <h5 className="text-lg font-semibold text-gray-800">Current Debts</h5>
-                  <button
-                    onClick={() => {
-                      const newDebt = {
-                        id: Date.now(),
-                        type: '',
-                        name: '',
-                        balance: '',
-                        monthlyPayment: '',
-                        payoffDate: ''
-                      };
-                      updateFormData('currentDebts', [...formData.currentDebts, newDebt]);
-                    }}
-                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
-                  >
-                    + Add Debt
-                  </button>
-                </div>
-
-                {formData.currentDebts.length === 0 ? (
-                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
-                    <p className="text-gray-600">
-                      Do you have a mortgage, student loans, credit cards, or other debts? Click "Add Debt" to include them.
-                    </p>
-                    <p className="text-sm text-gray-500 mt-2">
-                      💡 We'll calculate when they'll be paid off and how that affects your retirement timeline
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {formData.currentDebts.map((debt, index) => (
-                      <div key={debt.id} className="bg-red-50 border border-red-200 rounded-lg p-4">
-                        <div className="grid md:grid-cols-5 gap-4 mb-4">
-                          <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-2">Debt Type</label>
-                            <select
-                              value={debt.type}
-                              onChange={(e) => {
-                                const updatedDebts = [...formData.currentDebts];
-                                updatedDebts[index].type = e.target.value;
-                                updateFormData('currentDebts', updatedDebts);
-                              }}
-                              className="w-full p-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
-                            >
-                              <option value="">Select...</option>
-                              <option value="mortgage">Mortgage</option>
-                              <option value="student_loan">Student Loan</option>
-                              <option value="credit_card">Credit Card</option>
-                              <option value="car_loan">Car Loan</option>
-                              <option value="personal_loan">Personal Loan</option>
-                              <option value="heloc">HELOC</option>
-                              <option value="other">Other</option>
-                            </select>
-                          </div>
-
-                          <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-2">Description</label>
-                            <input
-                              type="text"
-                              value={debt.name}
-                              onChange={(e) => {
-                                const updatedDebts = [...formData.currentDebts];
-                                updatedDebts[index].name = e.target.value;
-                                updateFormData('currentDebts', updatedDebts);
-                              }}
-                              placeholder="e.g., Home mortgage, MBA loan..."
-                              className="w-full p-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-2">Balance</label>
-                            <input
-                              type="number"
-                              value={debt.balance}
-                              onChange={(e) => {
-                                const updatedDebts = [...formData.currentDebts];
-                                updatedDebts[index].balance = e.target.value;
-                                updateFormData('currentDebts', updatedDebts);
-                              }}
-                              placeholder="150000"
-                              className="w-full p-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-2">Monthly Payment</label>
-                            <input
-                              type="number"
-                              value={debt.monthlyPayment}
-                              onChange={(e) => {
-                                const updatedDebts = [...formData.currentDebts];
-                                updatedDebts[index].monthlyPayment = e.target.value;
-                                updateFormData('currentDebts', updatedDebts);
-                              }}
-                              placeholder="1200"
-                              className="w-full p-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
-                            />
-                          </div>
-
-                          <div className="flex items-end">
-                            <button
-                              onClick={() => {
-                                const updatedDebts = formData.currentDebts.filter((_, i) => i !== index);
-                                updateFormData('currentDebts', updatedDebts);
-                              }}
-                              className="w-full p-2 text-red-600 border border-red-300 rounded-lg hover:bg-red-50 transition-colors"
-                            >
-                              Remove
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Payoff Timeline Question */}
-                        <div className="border-t border-red-300 pt-4">
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">
-                            When will this be paid off?
-                          </label>
-                          <input
-                            type="date"
-                            value={debt.payoffDate}
-                            onChange={(e) => {
-                              const updatedDebts = [...formData.currentDebts];
-                              updatedDebts[index].payoffDate = e.target.value;
-                              updateFormData('currentDebts', updatedDebts);
-                            }}
-                            className="w-full p-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
-                          />
-                          
-                          {debt.payoffDate && formData.currentAge && (
-                            (() => {
-                              const payoffYear = new Date(debt.payoffDate).getFullYear();
-                              const currentYear = new Date().getFullYear();
-                              const retirementAge = 65; // Default retirement age
-                              const retirementYear = currentYear + (retirementAge - parseInt(formData.currentAge));
-                              const paidOffBeforeRetirement = payoffYear <= retirementYear;
-                              
-                              return (
-                                <div className={`mt-2 p-2 rounded ${paidOffBeforeRetirement ? 'bg-green-50 border border-green-200' : 'bg-yellow-50 border border-yellow-200'}`}>
-                                  <p className={`text-xs ${paidOffBeforeRetirement ? 'text-green-800' : 'text-yellow-800'}`}>
-                                    {paidOffBeforeRetirement 
-                                      ? "✅ This will be paid off before your Someday Life begins - great!"
-                                      : "⚠️ This debt may still exist during retirement - we'll factor this into your planning"
-                                    }
-                                  </p>
-                                </div>
-                              );
-                            })()
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Preliminary Insight */}
-            {preliminaryInsight && (
-              <div className="mb-6 bg-gradient-to-r from-green-50 to-blue-50 rounded-xl p-6 border border-green-200">
-                <div className="text-center mb-4">
-                  <div className="flex items-center justify-center mb-2">
-                    <div className="bg-green-500 rounded-full w-2 h-2 mr-2 animate-pulse"></div>
-                    <span className="text-sm font-medium text-green-800">
-                      Early insight with your income of ${preliminaryInsight.totalIncome}
-                    </span>
-                  </div>
-                  <h4 className="text-xl font-bold text-gray-800">
-                    {preliminaryInsight.isCalculating 
-                      ? 'Calculating your timeline...'
-                      : `Your ${preliminaryInsight.dreamName} in ${preliminaryInsight.yearsToTarget} years (by age ${preliminaryInsight.targetAge})`
-                    }
-                  </h4>
-                  <p className="text-gray-600">
-                    {preliminaryInsight.isCalculating 
-                      ? 'Please ensure all fields are filled out correctly'
-                      : `Timeline: ${preliminaryInsight.yearsToTarget} years to achievement`
-                    }
-                    {preliminaryInsight.monthlyRequired && !preliminaryInsight.isCalculating && (
-                      <span className="block text-sm text-blue-600 mt-1">
-                        Monthly savings needed: ${preliminaryInsight.monthlyRequired.toLocaleString()}
-                      </span>
-                    )}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* AI Insight after financial data entry */}
-            {formData.currentAge && formData.incomeRange && formData.occupation && (
-              <div className="mb-6">
-                <AIInsight
-                  type="financial-percentile"
-                  data={{
-                    income: useIncomeRange 
-                      ? (incomeRanges.find(range => range.value === formData.incomeRange)?.midpoint || 0)
-                      : parseFloat(formData.incomeRange.toString().replace(/,/g, '')) || 0,
-                    age: formData.currentAge,
-                    savings: formData.currentAssets.reduce((total, asset) => total + (parseFloat(asset.value) || 0), 0),
-                    percentile: (() => {
-                      const income = useIncomeRange 
-                        ? (incomeRanges.find(range => range.value === formData.incomeRange)?.midpoint || 0)
-                        : parseFloat(formData.incomeRange.toString().replace(/,/g, '')) || 0;
-                      const age = parseInt(formData.currentAge);
-                      
-                      // Simple percentile calculation based on age and income
-                      if (age < 35) {
-                        return income > 80000 ? 75 : income > 60000 ? 60 : income > 45000 ? 45 : 30;
-                      } else if (age < 50) {
-                        return income > 120000 ? 80 : income > 90000 ? 65 : income > 70000 ? 50 : 35;
-                      } else {
-                        return income > 150000 ? 85 : income > 100000 ? 70 : income > 80000 ? 55 : 40;
-                      }
-                    })()
-                  }}
-                  confidence="89"
-                />
-              </div>
-            )}
-
-            {/* Navigation */}
-            <div className="flex justify-between">
+            <div className="flex justify-between mt-8">
               <button
                 onClick={handleBack}
                 className="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors"
@@ -3169,7 +3376,7 @@ const SomedayLifeBuilder = ({ onComplete, onBack }) => {
               </button>
               <button
                 onClick={calculateFinalResults}
-                disabled={!formData.currentAge || !formData.incomeRange || !formData.selectedState || !formData.occupation || !formData.industry}
+                disabled={!formData.currentAge || !formData.incomeRange || !formData.selectedState}
                 className="px-8 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
               >
                 Create My Plan
@@ -3199,6 +3406,179 @@ const SomedayLifeBuilder = ({ onComplete, onBack }) => {
           </div>
         )}
       </div>
+      
+      {/* Dream Analysis Modal */}
+    {showAnalysisModal && dreamAnalysis && (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center">
+                <Sparkles className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h3 className="text-2xl font-bold text-gray-900">AI Dream Analysis Complete</h3>
+                <p className="text-gray-600">
+                  {dreamAnalysis.wordCount && dreamAnalysis.processingTime && dreamAnalysis.complexity
+                    ? `Analyzed ${dreamAnalysis.wordCount} words in ${dreamAnalysis.processingTime} • ${dreamAnalysis.complexity}`
+                    : 'Understanding your retirement vision'
+                  }
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowAnalysisModal(false)}
+              className="text-gray-400 hover:text-gray-600 transition-colors p-2"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+
+          {/* Detected Themes Section */}
+          {dreamAnalysis.themes && dreamAnalysis.themes.length > 0 && (
+            <div className="mb-8">
+              <h4 className="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                <span className="text-2xl">🧠</span>
+                We noticed these themes in your vision:
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {dreamAnalysis.themes.map((theme, index) => (
+                  <div key={index} className="bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl p-4 border border-gray-200">
+                    <div className="flex items-center gap-3 mb-2">
+                      <span className="text-2xl">{theme.icon}</span>
+                      <div>
+                        <h5 className="font-semibold text-gray-800">{theme.name}</h5>
+                        <div className="flex items-center gap-2">
+                          <div className={`w-2 h-2 rounded-full bg-${theme.color}-500`}></div>
+                          <span className="text-sm text-gray-600">{theme.confidence}% confidence</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      <span className="font-medium">Detected: </span>
+                      {theme.matchedElements.slice(0, 3).join(', ')}
+                      {theme.matchedElements.length > 3 && '...'}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {dreamAnalysis.suggested ? (
+            <>
+              {/* Main Recommendation */}
+              <div className="mb-8 p-6 bg-gradient-to-r from-purple-50 to-blue-50 rounded-2xl border-2 border-purple-200">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="w-8 h-8 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full flex items-center justify-center">
+                    <span className="text-white font-bold text-sm">AI</span>
+                  </div>
+                  <div>
+                    <h4 className="text-xl font-bold text-gray-900">Recommended Path</h4>
+                    <p className="text-gray-600">Based on your themes, we suggest exploring:</p>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-xl p-6 border border-purple-200 mb-4">
+                  <div className="flex items-center gap-4 mb-3">
+                    <div className={`w-6 h-6 rounded-full bg-gradient-to-r ${
+                      dreamAnalysis.suggested === 'rooted-living' ? 'from-emerald-400 to-green-500' :
+                      dreamAnalysis.suggested === 'nomadic-freedom' ? 'from-blue-400 to-cyan-500' :
+                      dreamAnalysis.suggested === 'purpose-driven' ? 'from-purple-400 to-indigo-500' :
+                      dreamAnalysis.suggested === 'multi-base' ? 'from-orange-400 to-amber-500' :
+                      'from-pink-400 to-rose-500'
+                    }`} />
+                    <h5 className="text-2xl font-bold text-gray-900">
+                      {dreamAnalysis.suggested.split('-').map(word => 
+                        word.charAt(0).toUpperCase() + word.slice(1)
+                      ).join(' ')} Path
+                    </h5>
+                    <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                      dreamAnalysis.confidence >= 80 ? 'bg-green-100 text-green-700' :
+                      dreamAnalysis.confidence >= 60 ? 'bg-blue-100 text-blue-700' :
+                      'bg-orange-100 text-orange-700'
+                    }`}>
+                      {dreamAnalysis.confidence}% match
+                    </span>
+                  </div>
+                  <p className="text-gray-700 text-lg leading-relaxed mb-4">{dreamAnalysis.explanation}</p>
+                  
+                  <div className="flex gap-4">
+                    <button
+                      onClick={() => handleAcceptSuggestion(dreamAnalysis.suggested)}
+                      className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-3 rounded-xl hover:from-purple-700 hover:to-blue-700 transition-all font-semibold text-lg transform hover:scale-105"
+                    >
+                      🚀 Yes! Let's explore this path
+                    </button>
+                    <button
+                      onClick={() => setShowAnalysisModal(false)}
+                      className="flex-1 bg-gray-100 text-gray-700 px-6 py-3 rounded-xl hover:bg-gray-200 transition-colors font-semibold"
+                    >
+                      Let me refine my dream first
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Alternative Paths */}
+              {dreamAnalysis.alternativesSuggested && dreamAnalysis.alternativesSuggested.length > 0 && (
+                <div className="mb-8">
+                  <h5 className="text-lg font-semibold text-gray-800 mb-6">{getSomedayBuilderContent('alternativePaths', 'Other paths that might resonate:')}</h5>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {dreamAnalysis.alternativesSuggested.map(archetypeId => {
+                      const archetypeData = getArchetypeCards().find(a => a.id === archetypeId);
+                      return archetypeData ? (
+                        <ArchetypeCard
+                          key={archetypeId}
+                          archetype={archetypeData}
+                          isRecommended={false}
+                          onClick={() => handleAcceptSuggestion(archetypeId)}
+                        />
+                      ) : null;
+                    })}
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            /* No Clear Match - Enhanced */
+            <div className="mb-8 p-6 bg-yellow-50 rounded-2xl border-2 border-yellow-200">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center">
+                  <span className="text-yellow-600 text-2xl">🤔</span>
+                </div>
+                <div>
+                  <h4 className="text-xl font-bold text-gray-900">We need more details to guide you</h4>
+                  <p className="text-gray-600">Your vision shows promise, but we'd love to understand it better</p>
+                </div>
+              </div>
+              <p className="text-gray-700 text-lg mb-6">{dreamAnalysis.explanation}</p>
+              <button
+                onClick={() => setShowAnalysisModal(false)}
+                className="bg-yellow-500 text-white px-6 py-3 rounded-xl hover:bg-yellow-600 transition-colors font-semibold"
+              >
+                I'll add more details to my dream
+              </button>
+            </div>
+          )}
+
+          {/* All Paths Available */}
+          <div className="border-t border-gray-200 pt-6">
+            <h5 className="text-lg font-semibold text-gray-800 mb-6">{getSomedayBuilderContent('explorePaths', 'Or explore any path that interests you:')}</h5>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {getArchetypeCards().map(archetype => (
+                <ArchetypeCard
+                  key={archetype.id}
+                  archetype={archetype}
+                  isRecommended={dreamAnalysis.suggested === archetype.id}
+                  onClick={() => handleAcceptSuggestion(archetype.id)}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
     </div>
   );
 };

@@ -29,13 +29,65 @@ export const getAdaptiveContent = (contentType, section = 'default', fallback = 
       },
       stepIntro: {
         dreamer: 'Let your imagination soar as we craft your dream retirement',
-        validator: 'Let\'s systematically plan your secure retirement future',
+        validator: 'Let\'s specify your retirement needs',
         beginner: 'Let\'s learn together how to build your retirement plan'
       },
       lifeVisionPrompt: {
         dreamer: 'Describe your magical someday life in vivid detail',
-        validator: 'Define your realistic retirement lifestyle and requirements',
+        validator: 'Define your retirement lifestyle requirements in detail',
         beginner: 'Think about what you\'d like your retirement to look like'
+      },
+      archetypeTitle: {
+        dreamer: 'Choose your lifestyle archetype',
+        validator: 'Select your retirement structure',
+        beginner: 'Pick the retirement style that fits you'
+      },
+      archetypeIntro: {
+        dreamer: 'Every dreamer has a unique vision. Which lifestyle archetype resonates with your soul?',
+        validator: 'Every retiree needs a structured approach. Which retirement framework aligns with your requirements?',
+        beginner: 'Different people want different retirement styles. Which one sounds right for you?'
+      },
+      alternativePaths: {
+        dreamer: 'Other paths that might resonate:',
+        validator: 'Alternative structures to consider:',
+        beginner: 'Other options you might like:'
+      },
+      explorePaths: {
+        dreamer: 'Or explore any path that interests you:',
+        validator: 'Or review all available retirement structures:',
+        beginner: 'Or look at all the different styles:'
+      },
+      dreamPlaceholder: {
+        dreamer: `Paint us a picture of your someday life... 
+
+Imagine waking up without an alarm clock. The morning light streams through your window, and you have complete freedom to choose how to spend your day. 
+
+• What does this perfect day look like? 
+• Where does it take place? 
+• Who shares these moments with you? 
+• What activities fill your heart with joy and purpose?
+
+Don't worry about money or logistics right now - just dream freely and let your imagination soar...`,
+        validator: `Define your retirement lifestyle requirements in detail...
+
+Describe your typical retirement day from morning to evening. Focus on practical aspects:
+
+• Where will you live and what type of housing do you need?
+• What activities will fill your time (hobbies, volunteering, travel)?
+• What level of comfort and amenities do you require?
+• What people do you want to be near or spend time with?
+
+Be specific about your needs and preferences to help us calculate accurate costs...`,
+        beginner: `Think about what you'd like your retirement to look like...
+
+Try to imagine a typical day when you're retired:
+
+• Where would you like to live?
+• What would you do with your free time?
+• Who would you want to spend time with?
+• What activities interest you?
+
+Don't worry if you're not sure about everything - just write down what sounds appealing to you...`
       },
       locationSection: {
         dreamer: 'Where will your dream life unfold?',

@@ -3,14 +3,25 @@
  * Provides standardized methods for dream CRUD operations
  * All components should use these methods instead of directly accessing localStorage
  * 
- * Goal Types:
+ * CRITICAL: Implements data hierarchy protection to prevent accidental deletion of core goals
+ * 
+ * Data Hierarchy:
+ * - 'primarySomedayLife': The one and only foundational retirement vision (PROTECTED)
+ * - 'lifeMilestones': Life events and journey milestones (editable)
+ * - 'secondaryDreams': Additional aspirational goals (editable)
+ * 
+ * Legacy Goal Types (for backward compatibility):
  * - 'someday_life': Major life change goals with property cost and annual expenses
  * - 'milestone': Single purchase or achievement goals
  * - 'investment': Financial investment or savings goals
  */
 
 // Migration flag to ensure migration runs only once
-const MIGRATION_KEY = 'dreams_migration_v1_completed'
+const MIGRATION_KEY = 'dreams_migration_v2_completed'
+const DATA_PROTECTION_ENABLED = true
+
+// Import recovery service
+import { DataRecoveryService } from './dataRecoveryService.js'
 
 export const DreamService = {
   /**
@@ -29,19 +40,30 @@ export const DreamService = {
   },
 
   /**
-   * Save a new dream to localStorage
+   * Save a new dream to localStorage with data protection
    * @param {Object} dream - Dream object to save
    * @returns {Array} Updated dreams array
    */
   saveDream: (dream) => {
     try {
+      // Create backup before saving
+      if (DATA_PROTECTION_ENABLED) {
+        DataRecoveryService.createBackup()
+      }
+      
       const dreams = DreamService.getAllDreams()
       
       // Validate Someday Life constraint
       if (dream.type === 'someday_life') {
         const existingSomedayLife = dreams.find(d => d.type === 'someday_life')
         if (existingSomedayLife) {
-          throw new Error('SOMEDAY_LIFE_EXISTS')
+          // Instead of throwing error, offer replacement
+          const replace = confirm(`You already have a Someday Life goal: "${existingSomedayLife.title}"\n\nWould you like to replace it with: "${dream.title}"?`)
+          if (replace) {
+            return DreamService.replaceSomedayLifeGoal(dream)
+          } else {
+            throw new Error('SOMEDAY_LIFE_EXISTS')
+          }
         }
       }
       
@@ -58,6 +80,8 @@ export const DreamService = {
       
       dreams.push(newDream)
       localStorage.setItem('dreams', JSON.stringify(dreams))
+      
+      console.log(`💾 Saved new dream: ${newDream.title} (${newDream.type})`)
       return dreams
     } catch (error) {
       console.error('Error saving dream:', error)
@@ -66,15 +90,65 @@ export const DreamService = {
   },
 
   /**
-   * Delete a dream by ID
+   * Delete a dream by ID with data protection
    * @param {string|number} id - Dream ID to delete
    * @returns {Array} Updated dreams array
    */
   deleteDream: (id) => {
     try {
-      const dreams = DreamService.getAllDreams().filter(d => d.id !== id)
-      localStorage.setItem('dreams', JSON.stringify(dreams))
-      return dreams
+      // Create backup before any deletion
+      if (DATA_PROTECTION_ENABLED) {
+        DataRecoveryService.createBackup()
+      }
+      
+      const dreams = DreamService.getAllDreams()
+      const dreamToDelete = dreams.find(d => d.id === id)
+      
+      if (!dreamToDelete) {
+        console.warn('Dream not found for deletion:', id)
+        return dreams
+      }
+      
+      // CRITICAL PROTECTION: Prevent deletion of primary Someday Life
+      if (dreamToDelete.type === 'someday_life') {
+        const confirmMessage = `🚨 CRITICAL WARNING 🚨
+
+You are about to delete your core Someday Life vision: "${dreamToDelete.title}"
+
+This is your foundational retirement plan that everything else builds upon.
+
+To change your Someday Life vision, please use the Someday Life Builder instead.
+
+Are you absolutely sure you want to DELETE this permanently?`
+        
+        if (!confirm(confirmMessage)) {
+          console.log('🛡️ Someday Life deletion cancelled by user')
+          return dreams
+        }
+        
+        // If user really wants to delete, show second confirmation
+        const finalConfirm = confirm('This will remove your entire financial foundation.\n\nType "DELETE" in the next prompt to confirm.')
+        if (!finalConfirm) {
+          console.log('🛡️ Someday Life deletion cancelled on second confirmation')
+          return dreams
+        }
+        
+        const deleteConfirmation = prompt('Type "DELETE" to permanently remove your Someday Life:')
+        if (deleteConfirmation !== 'DELETE') {
+          console.log('🛡️ Someday Life deletion cancelled - incorrect confirmation')
+          return dreams
+        }
+        
+        console.log('⚠️ User confirmed Someday Life deletion with triple confirmation')
+      }
+      
+      // Perform deletion
+      const updatedDreams = dreams.filter(d => d.id !== id)
+      localStorage.setItem('dreams', JSON.stringify(updatedDreams))
+      
+      console.log(`🗑️ Deleted dream: ${dreamToDelete.title} (${dreamToDelete.type})`)
+      return updatedDreams
+      
     } catch (error) {
       console.error('Error deleting dream:', error)
       throw error
@@ -264,6 +338,57 @@ export const DreamService = {
   },
 
   /**
+   * Emergency data recovery - attempt to recover lost Someday Life
+   * @returns {Object|null} Recovered dream or null
+   */
+  emergencyRecovery: () => {
+    console.log('🎆 EMERGENCY RECOVERY INITIATED')
+    
+    try {
+      const diagnosis = DataRecoveryService.diagnoseDataState()
+      const recovered = DataRecoveryService.recoverSomedayLifeData()
+      
+      if (recovered) {
+        // Save the recovered dream
+        const dreams = DreamService.getAllDreams()
+        dreams.push(recovered)
+        localStorage.setItem('dreams', JSON.stringify(dreams))
+        
+        console.log('✅ RECOVERY SUCCESSFUL:', recovered.title)
+        return recovered
+      }
+      
+      console.log('❌ No recoverable data found')
+      return null
+      
+    } catch (error) {
+      console.error('Emergency recovery failed:', error)
+      return null
+    }
+  },
+
+  /**
+   * Check if emergency recovery is available
+   * @returns {boolean} True if recovery data exists
+   */
+  canRecover: () => {
+    try {
+      const diagnosis = DataRecoveryService.diagnoseDataState()
+      return diagnosis.recommendations.some(rec => rec.includes('RECOVERY_NEEDED') || rec.includes('LEGACY_SOMEDAY_FOUND'))
+    } catch (error) {
+      return false
+    }
+  },
+
+  /**
+   * Get data diagnosis for debugging
+   * @returns {Object} Diagnosis object
+   */
+  getDiagnosis: () => {
+    return DataRecoveryService.diagnoseDataState()
+  },
+
+  /**
    * Run migration to categorize existing dreams (runs once)
    */
   runMigrationIfNeeded: () => {
@@ -273,7 +398,20 @@ export const DreamService = {
         return
       }
       
-      console.log('🔄 Running dreams migration to categorize goal types...')
+      console.log('🔄 Running dreams migration v2 to categorize goal types and add data protection...')
+      
+      // Check for emergency recovery needs first
+      const currentDreams = JSON.parse(localStorage.getItem('dreams') || '[]')
+      const hasSomedayLife = currentDreams.some(d => d.type === 'someday_life')
+      
+      if (!hasSomedayLife) {
+        console.log('🔎 No Someday Life found in dreams, checking for recovery...')
+        const diagnosis = DataRecoveryService.diagnoseDataState()
+        if (diagnosis.recommendations.some(rec => rec.includes('RECOVERY'))) {
+          console.log('🎆 Recovery data detected, marking for emergency recovery')
+          localStorage.setItem('needsEmergencyRecovery', 'true')
+        }
+      }
       
       let dreams = JSON.parse(localStorage.getItem('dreams') || '[]')
       let migrationChanges = 0
@@ -375,14 +513,23 @@ export const DreamService = {
       localStorage.setItem('dreams', JSON.stringify(dreams))
       localStorage.setItem(MIGRATION_KEY, 'true')
       
-      console.log(`✅ Migration completed:`, {
+      const finalStats = {
         totalDreams: dreams.length,
         categorized: migrationChanges,
         duplicatesRemoved,
         somedayLifeGoals: dreams.filter(d => d.type === 'someday_life').length,
         milestones: dreams.filter(d => d.type === 'milestone').length,
-        investments: dreams.filter(d => d.type === 'investment').length
-      })
+        investments: dreams.filter(d => d.type === 'investment').length,
+        dataProtectionEnabled: DATA_PROTECTION_ENABLED
+      }
+      
+      console.log(`✅ Migration v2 completed:`, finalStats)
+      
+      // If no Someday Life goals after migration, mark for recovery
+      if (finalStats.somedayLifeGoals === 0) {
+        localStorage.setItem('needsEmergencyRecovery', 'true')
+        console.log('🚨 No Someday Life goals found after migration - emergency recovery flagged')
+      }
       
     } catch (error) {
       console.error('Error during migration:', error)

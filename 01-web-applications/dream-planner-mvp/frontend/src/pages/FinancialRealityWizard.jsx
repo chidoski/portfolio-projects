@@ -8,6 +8,7 @@ import { AIConfidenceBadge } from '../components/AIInsight';
 const FinancialRealityWizard = ({ onComplete, onBack }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [financialProfile, setFinancialProfile] = useState(null);
+  const [dreamContext, setDreamContext] = useState(null);
   const [debts, setDebts] = useState([]);
   const [currentDebt, setCurrentDebt] = useState({
     name: '',
@@ -104,6 +105,19 @@ const FinancialRealityWizard = ({ onComplete, onBack }) => {
     'fixed-expenses',
     'review-and-calculate'
   ];
+
+  // Load dream context on mount
+  useEffect(() => {
+    try {
+      const savedDream = localStorage.getItem('somedayDream');
+      if (savedDream) {
+        const dream = JSON.parse(savedDream);
+        setDreamContext(dream);
+      }
+    } catch (error) {
+      console.error('Error loading dream context:', error);
+    }
+  }, []);
 
   // Load existing financial profile on mount
   useEffect(() => {
@@ -828,55 +842,77 @@ const FinancialRealityWizard = ({ onComplete, onBack }) => {
 
   // Render welcome step
   const renderWelcomeStep = () => (
-    <div className="max-w-2xl mx-auto text-center">
-      <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-6 rounded-full w-24 h-24 mx-auto mb-8 flex items-center justify-center">
-        <Heart className="w-12 h-12 text-white" />
-      </div>
-      
-      <h1 className="text-4xl font-bold text-gray-800 mb-6">
-        {getFinancialRealityContent('pageTitle', 'Let\'s understand what you\'re working with today')}
-      </h1>
-      
-      <p className="text-xl text-gray-600 mb-8 leading-relaxed">
-        <span className="font-semibold text-blue-600">No judgment, just math.</span>
-        <br />
-        {getFinancialRealityContent('pageSubtitle', 'Understanding your current obligations helps us create a realistic path to your dreams. Every successful journey starts with knowing where you are.')}
-      </p>
-      
-      <div className="bg-blue-50 rounded-xl p-6 mb-8">
-        <div className="flex items-center justify-center mb-4">
-          <CheckCircle className="w-6 h-6 text-blue-600 mr-2" />
-          <span className="font-semibold text-blue-800">What we'll cover together:</span>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-4xl">
+        <div className="text-center mb-8">
+          <div className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            <h2 className="text-4xl font-bold mb-4">
+              {getFinancialRealityContent('pageTitle', 'Now, Let\'s Map Your Journey')}
+            </h2>
+          </div>
+          <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed mb-4">
+            <span className="font-semibold text-blue-600">You've painted a beautiful picture of your future.</span>
+            <br />
+            {getFinancialRealityContent('pageSubtitle', 'Now let\'s understand where you\'re starting from today to create your personalized roadmap to freedom.')}
+          </p>
         </div>
-        <ul className="text-left text-blue-700 space-y-2 max-w-md mx-auto">
-          <li>• Your current debts and obligations</li>
-          <li>• How long until each is paid off</li>
-          <li>• Strategies to optimize your timeline</li>
-          <li>• Ways to free up money for your dreams</li>
-        </ul>
+        
+        <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl p-8 mb-8">
+          <h3 className="text-2xl font-bold text-gray-800 mb-6 text-center">
+            What We'll Discover Together
+          </h3>
+          <div className="grid md:grid-cols-3 gap-6">
+            <div className="text-center">
+              <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CreditCard className="w-8 h-8 text-blue-600" />
+              </div>
+              <h4 className="font-semibold text-gray-800 mb-2">Your Current Debts</h4>
+              <p className="text-gray-600 text-sm">Understanding what you owe and creating an optimization plan</p>
+            </div>
+            <div className="text-center">
+              <div className="bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Home className="w-8 h-8 text-green-600" />
+              </div>
+              <h4 className="font-semibold text-gray-800 mb-2">Your Current Monthly Expenses</h4>
+              <p className="text-gray-600 text-sm">What you spend today, before retirement</p>
+            </div>
+            <div className="text-center">
+              <div className="bg-purple-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Calculator className="w-8 h-8 text-purple-600" />
+              </div>
+              <h4 className="font-semibold text-gray-800 mb-2">Your Path Forward</h4>
+              <p className="text-gray-600 text-sm">Personalized timeline and optimization strategies</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="text-center">
+          <button
+            onClick={nextStep}
+            className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-4 rounded-xl text-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all duration-300 shadow-lg"
+          >
+            {getFinancialRealityContent('startButton', 'Let\'s Map Your Journey')}
+            <ArrowRight className="w-5 h-5 ml-2 inline" />
+          </button>
+        </div>
       </div>
-      
-      <button
-        onClick={nextStep}
-        className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-8 py-4 rounded-xl font-semibold text-lg hover:from-blue-600 hover:to-purple-700 transition-all duration-300 transform hover:scale-105"
-      >
-        Let's start with the good stuff
-        <ArrowRight className="w-5 h-5 ml-2 inline" />
-      </button>
     </div>
   );
 
-  // Render debt categories step
+  // Render debt categories step with consistent styling
   const renderDebtCategoriesStep = () => (
-    <div className="max-w-4xl mx-auto">
-      <div className="text-center mb-8">
-        <h2 className="text-3xl font-bold text-gray-800 mb-4">
-          Which of these sound familiar?
-        </h2>
-        <p className="text-lg text-gray-600">
-          Click on any that apply to you. We'll handle them one at a time.
-        </p>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-4xl">
+        <div className="text-center mb-8">
+          <div className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            <h2 className="text-3xl font-bold mb-4">
+              Which of these sound familiar?
+            </h2>
+          </div>
+          <p className="text-lg text-gray-600">
+            Click on any that apply to you. We'll handle them one at a time.
+          </p>
+        </div>
       
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         {debtCategories.map((category) => {
@@ -933,23 +969,24 @@ const FinancialRealityWizard = ({ onComplete, onBack }) => {
         </div>
       )}
       
-      <div className="flex justify-between mt-8">
-        <button
-          onClick={prevStep}
-          className="flex items-center text-gray-600 hover:text-gray-800 transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4 mr-1" />
-          Back
-        </button>
-        
-        {debts.length === 0 && (
+        <div className="flex justify-between mt-8">
           <button
-            onClick={() => setCurrentStep(3)}
-            className="text-blue-600 hover:text-blue-800 transition-colors"
+            onClick={prevStep}
+            className="flex items-center text-gray-600 hover:text-gray-800 transition-colors"
           >
-            Skip - I don't have any debts →
+            <ArrowLeft className="w-4 h-4 mr-1" />
+            Back
           </button>
-        )}
+          
+          {debts.length === 0 && (
+            <button
+              onClick={() => setCurrentStep(3)}
+              className="text-blue-600 hover:text-blue-800 transition-colors"
+            >
+              Skip - I don't have any debts →
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -1125,21 +1162,26 @@ const FinancialRealityWizard = ({ onComplete, onBack }) => {
 
   // Render fixed expenses step
   const renderFixedExpensesStep = () => (
-    <div className="max-w-2xl mx-auto">
-      <div className="text-center mb-8">
-        <div className="bg-gradient-to-r from-green-500 to-blue-600 p-6 rounded-full w-24 h-24 mx-auto mb-6 flex items-center justify-center">
-          <Home className="w-12 h-12 text-white" />
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-4xl">
+        <div className="text-center mb-8">
+          <div className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            <h2 className="text-3xl font-bold mb-4">
+              Your Current Monthly Expenses
+            </h2>
+          </div>
+          <p className="text-lg text-gray-600 mb-4">
+            What you spend today, before retirement
+          </p>
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 max-w-2xl mx-auto">
+            <p className="text-sm text-yellow-800">
+              📝 <strong>Note:</strong> These are NOT your future retirement expenses - we already captured those. 
+              This is what you spend right now in your current life.
+            </p>
+          </div>
         </div>
-        
-        <h2 className="text-3xl font-bold text-gray-800 mb-4">
-          Now let's talk about your essentials
-        </h2>
-        <p className="text-lg text-gray-600">
-          The things you need to keep your life running smoothly. We'll keep this simple.
-        </p>
-      </div>
 
-      <div className="bg-white rounded-xl p-8 shadow-lg">
+        <div className="bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl p-6">
         {/* Quick Mode Toggle */}
         <div className="mb-8 p-4 bg-gray-50 rounded-lg">
           <div className="flex items-center justify-between">
@@ -1600,6 +1642,7 @@ const FinancialRealityWizard = ({ onComplete, onBack }) => {
             )}
           </button>
         </div>
+        </div>
       </div>
     </div>
   );
@@ -1819,6 +1862,18 @@ const FinancialRealityWizard = ({ onComplete, onBack }) => {
       )}
       
       <div className="max-w-6xl mx-auto px-4">
+        {/* Journey Context Banner */}
+        <div className="bg-gradient-to-r from-blue-100 to-purple-100 rounded-2xl p-6 mb-8 border border-blue-200">
+          <div className="text-center">
+            <h3 className="text-lg font-semibold text-gray-800 mb-2">
+              Building plan for: <span className="text-blue-600">{dreamContext?.title || 'Your Retirement Dream'}</span>
+            </h3>
+            <p className="text-sm text-gray-600">
+              Now let's understand where you're starting from to map your journey to tomorrow's dream
+            </p>
+          </div>
+        </div>
+        
         {/* Progress Indicator */}
         <div className="mb-8">
           <div className="flex justify-center items-center space-x-4">

@@ -18,13 +18,14 @@ const SomedayLifeHero = ({
   
   const [animationStarted, setAnimationStarted] = useState(false)
   
-  // Calculate totals and progress
-  const totalLivingExpenses = livingExpensesPerYear * yearsOfExpenses
-  const totalSomedayLifeCost = propertyTarget + totalLivingExpenses
+  // Calculate totals and progress using proper 4% rule
+  // Portfolio needed = Annual expenses ÷ 0.04 (4% withdrawal rule)
+  const portfolioNeededForExpenses = livingExpensesPerYear / 0.04
+  const totalSomedayLifeCost = propertyTarget + portfolioNeededForExpenses
   const totalCurrentSaved = currentPropertySaved + currentExpensesSaved
   
   const propertyProgress = (currentPropertySaved / propertyTarget) * 100
-  const expensesProgress = (currentExpensesSaved / totalLivingExpenses) * 100
+  const expensesProgress = (currentExpensesSaved / portfolioNeededForExpenses) * 100
   const overallProgress = (totalCurrentSaved / totalSomedayLifeCost) * 100
   
   const yearsRemaining = targetAge - userAge
@@ -179,10 +180,10 @@ const SomedayLifeHero = ({
             color="#0B7A75"
             label="Living Fund"
             value={currentExpensesSaved}
-            target={totalLivingExpenses}
+            target={portfolioNeededForExpenses}
           />
           <div className="mt-3 text-xs text-gray-600">
-            {yearsOfExpenses} years × {formatCurrency(livingExpensesPerYear)}/year
+            Portfolio for {formatCurrency(livingExpensesPerYear)}/year (4% rule)
           </div>
         </div>
       </div>
@@ -246,36 +247,36 @@ const SomedayLifeHero = ({
               
               <div className="space-y-3">
                 {(() => {
-                  const yearsSecured = currentExpensesSaved / livingExpensesPerYear
-                  const yearsProgress = (yearsSecured / yearsOfExpenses) * 100
+                  const portfolioProgress = (currentExpensesSaved / portfolioNeededForExpenses) * 100
+                  const incomeReplaced = (currentExpensesSaved * 0.04) // 4% withdrawal from current savings
                   
                   return (
                     <>
                       <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-600">Progress</span>
-                        <span className="font-bold text-blue-700">{yearsProgress.toFixed(1)}%</span>
+                        <span className="text-sm text-gray-600">Portfolio Progress</span>
+                        <span className="font-bold text-blue-700">{portfolioProgress.toFixed(1)}%</span>
                       </div>
                       <div className="w-full bg-blue-200 rounded-full h-3">
                         <div 
                           className="bg-blue-600 h-3 rounded-full transition-all duration-2000 ease-out"
                           style={{ 
-                            width: animationStarted ? `${Math.min(yearsProgress, 100)}%` : '0%' 
+                            width: animationStarted ? `${Math.min(portfolioProgress, 100)}%` : '0%' 
                           }}
                         ></div>
                       </div>
                       <div className="text-center">
-                        <div className="text-lg font-bold text-gray-900">{yearsSecured.toFixed(1)} years</div>
-                        <div className="text-sm text-gray-600">of {yearsOfExpenses} years needed</div>
+                        <div className="text-lg font-bold text-gray-900">{formatCurrency(incomeReplaced)}/year</div>
+                        <div className="text-sm text-gray-600">of {formatCurrency(livingExpensesPerYear)}/year needed</div>
                       </div>
-                      {yearsSecured >= yearsOfExpenses ? (
+                      {portfolioProgress >= 100 ? (
                         <div className="bg-blue-100 rounded-lg p-3 text-center">
-                          <div className="text-sm font-medium text-blue-800">✅ Lifestyle fully secured!</div>
+                          <div className="text-sm font-medium text-blue-800">✅ Income fully replaced!</div>
                         </div>
                       ) : (
                         <div className="bg-gray-50 rounded-lg p-3 text-center">
                           <div className="text-sm text-gray-700">
-                            <span className="font-medium">{formatCurrency((yearsOfExpenses - yearsSecured) * livingExpensesPerYear)}</span> more needed<br/>
-                            <span className="text-xs">for full {yearsOfExpenses}-year security</span>
+                            <span className="font-medium">{formatCurrency(portfolioNeededForExpenses - currentExpensesSaved)}</span> more needed<br/>
+                            <span className="text-xs">for full income replacement</span>
                           </div>
                         </div>
                       )}
@@ -296,8 +297,8 @@ const SomedayLifeHero = ({
             <div className="text-sm text-gray-600">Property Cost</div>
           </div>
           <div className="bg-white rounded-lg p-4 shadow-sm">
-            <div className="text-2xl font-bold text-blue-600">{formatCurrency(totalLivingExpenses)}</div>
-            <div className="text-sm text-gray-600">Living Fund</div>
+            <div className="text-2xl font-bold text-blue-600">{formatCurrency(portfolioNeededForExpenses)}</div>
+            <div className="text-sm text-gray-600">Portfolio Needed</div>
           </div>
           <div className="bg-white rounded-lg p-4 shadow-sm">
             <div className="text-2xl font-bold text-purple-600">{formatCurrency(totalSomedayLifeCost)}</div>
@@ -323,7 +324,7 @@ const SomedayLifeHero = ({
             <div className="text-sm text-blue-800">
               Your Someday Life requires solving two equations simultaneously:<br/>
               <strong>1. Accumulation:</strong> Save {formatCurrency(propertyTarget)} to buy the cottage<br/>
-              <strong>2. Income Replacement:</strong> Build a {formatCurrency(totalLivingExpenses)} portfolio to generate {formatCurrency(livingExpensesPerYear)}/year forever (4% rule)<br/>
+              <strong>2. Income Replacement:</strong> Build a {formatCurrency(portfolioNeededForExpenses)} portfolio to generate {formatCurrency(livingExpensesPerYear)}/year forever (4% rule)<br/>
               <span className="mt-2 block">
                 Having the cottage means nothing if you can't afford to live there indefinitely.
               </span>

@@ -129,9 +129,9 @@ export const getTextVariants = (textType, fallbackText = '') => {
     
     // Welcome/Detailed page
     welcomeTitle: {
-      dreamer: 'Transform Dreams Into Life Planning',
-      validator: 'Transform Uncertainty Into Security Planning',
-      beginner: 'Transform Confusion Into Clear Planning'
+      dreamer: 'Design Your Someday Life Dream',
+      validator: 'Design Your Someday Life Dream',
+      beginner: 'Design Your Someday Life Dream'
     },
     
     welcomeSubtitle: {
@@ -141,9 +141,9 @@ export const getTextVariants = (textType, fallbackText = '') => {
     },
     
     welcomePrimaryCTA: {
-      dreamer: 'Start Planning Your Dreams',
-      validator: 'Start Building Your Security',
-      beginner: 'Start Learning & Planning'
+      dreamer: 'Start Designing My Dream',
+      validator: 'Start Designing My Dream',
+      beginner: 'Start Designing My Dream'
     },
     
     // Add dream button variants

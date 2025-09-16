@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import './utils/debugUtils.js' // Load debug utilities for console
 import { Sparkles, Calculator, Target, Eye } from 'lucide-react'
 import DreamBuilder from './components/DreamBuilder'
 import DreamCalculator from './components/DreamCalculator'

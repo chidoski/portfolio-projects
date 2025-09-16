@@ -101,21 +101,21 @@ const MinimalLanding = ({ onStartPlanning, onLearnMore }) => {
   // Psychological profile configurations
   const psychProfileConfigs = {
     dreamer: {
-      heroTitle: 'Transform Dreams Into Reality',
-      heroSubtitle: 'Your incredible future is closer than you think. Let\'s bring those beautiful dreams to life.',
-      buttonText: 'Make My Dreams Happen',
+      heroTitle: 'Design Your Someday Life Dream',
+      heroSubtitle: 'Turn your retirement vision into an achievable timeline in under 10 minutes.',
+      buttonText: 'Start Designing My Dream',
       learnMoreText: 'Discover the magic behind the process'
     },
     validator: {
-      heroTitle: 'Secure Your Financial Future',
-      heroSubtitle: 'Get clear, proven strategies to confidently build the retirement you deserve.',
-      buttonText: 'Build My Secure Plan',
+      heroTitle: 'Design Your Someday Life Dream',
+      heroSubtitle: 'Turn your retirement vision into an achievable timeline in under 10 minutes.',
+      buttonText: 'Start Designing My Dream',
       learnMoreText: 'See the proven methodology'
     },
     beginner: {
-      heroTitle: 'Start Your Financial Journey',
-      heroSubtitle: 'Simple, step-by-step guidance to help you build wealth and achieve your goals.',
-      buttonText: 'Learn How to Begin',
+      heroTitle: 'Design Your Someday Life Dream',
+      heroSubtitle: 'Turn your retirement vision into an achievable timeline in under 10 minutes.',
+      buttonText: 'Start Designing My Dream',
       learnMoreText: 'Understand the basics first'
     }
   };
@@ -381,8 +381,7 @@ const MinimalLanding = ({ onStartPlanning, onLearnMore }) => {
                 psychProfileConfigs[userPsychProfile].heroTitle
               ) : (
                 <>
-                  Transform Retirement Planning Into
-                  <span style={{ color: '#0B7A75' }}> Life Planning</span>
+                  Design Your Someday Life Dream
                 </>
               )}
             </h1>
@@ -393,7 +392,7 @@ const MinimalLanding = ({ onStartPlanning, onLearnMore }) => {
                 ? currentConfig.subtitle 
                 : userPsychProfile 
                   ? psychProfileConfigs[userPsychProfile].heroSubtitle 
-                  : 'See how your dreams become achievable through daily actions.'}
+                  : 'Turn your retirement vision into an achievable timeline in under 10 minutes.'}
             </p>
             
             {/* Personalized CTA Button */}
