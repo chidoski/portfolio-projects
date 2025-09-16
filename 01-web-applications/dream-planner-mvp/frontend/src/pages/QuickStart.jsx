@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ArrowLeft, Clock, DollarSign, Tag, Sparkles } from 'lucide-react'
 import { dreamTemplates } from '../data/dreamTemplates'
+import { getTextVariants } from '../utils/psychProfileUtils'
 
 export default function QuickStart({ onSelectTemplate, onBack }) {
   const [selectedCategory, setSelectedCategory] = useState('all')
@@ -69,11 +70,10 @@ export default function QuickStart({ onSelectTemplate, onBack }) {
               </div>
             </div>
             <h1 className="text-4xl font-bold text-gray-900 mb-4">
-              Quick Start Your Dream
+              {getTextVariants('quickStartTitle', 'Quick Start Your Dream')}
             </h1>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              Choose from our popular dream templates to get started instantly. 
-              Each template comes pre-configured with realistic amounts and timeframes.
+              {getTextVariants('quickStartSubtitle', 'Choose from our popular dream templates to get started instantly. Each template comes pre-configured with realistic amounts and timeframes.')}
             </p>
           </div>
         </div>
@@ -242,10 +242,10 @@ export default function QuickStart({ onSelectTemplate, onBack }) {
         {/* Bottom CTA */}
         <div className="text-center py-8 border-t border-gray-200">
           <h3 className="text-xl font-semibold text-gray-900 mb-2">
-            Don't see your dream here?
+            {getTextVariants('customOptionTitle', 'Don\'t see your dream here?')}
           </h3>
           <p className="text-gray-600 mb-4">
-            Create a custom dream with your own goals and timeline.
+            {getTextVariants('customOptionSubtitle', 'Create a custom dream with your own goals and timeline.')}
           </p>
           <button
             onClick={() => {
@@ -255,7 +255,7 @@ export default function QuickStart({ onSelectTemplate, onBack }) {
             }}
             className="btn-secondary px-6 py-3"
           >
-            Build Custom Someday Life
+            {getTextVariants('customOptionCTA', 'Build Custom Someday Life')}
           </button>
         </div>
       </div>

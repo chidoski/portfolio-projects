@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FinancialProfile, FinancialObligations } from '../models/FinancialProfile.js';
 import { TrendingUp, DollarSign, Calendar, Zap, Target, Award, ArrowRight } from 'lucide-react';
+import { AIConfidenceBadge } from './AIInsight';
 
 const DebtOptimizationDisplay = ({ debts, onScenarioSelect, dreamGoal = null, userAge = 30 }) => {
   const [scenarios, setScenarios] = useState(null);
@@ -547,9 +548,12 @@ const DebtOptimizationDisplay = ({ debts, onScenarioSelect, dreamGoal = null, us
     <div className="space-y-8">
       {/* Header */}
       <div className="text-center">
-        <h3 className="text-2xl font-bold text-gray-800 mb-2">
-          Your Paths to Freedom
-        </h3>
+        <div className="flex items-center justify-center gap-2 mb-2">
+          <h3 className="text-2xl font-bold text-gray-800">
+            Your Paths to Freedom
+          </h3>
+          <AIConfidenceBadge confidence="87%" source="historical data" variant="subtle" />
+        </div>
         <p className="text-lg text-gray-700 mb-4">
           How you handle your debt determines when you start living your dreams.
         </p>

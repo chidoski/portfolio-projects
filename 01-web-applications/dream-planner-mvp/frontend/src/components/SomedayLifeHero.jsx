@@ -187,8 +187,109 @@ const SomedayLifeHero = ({
         </div>
       </div>
       
-      {/* Bottom Stats */}
+      {/* Lifestyle Sustainability Meter */}
       <div className="mt-8 pt-6 border-t border-green-200">
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4 text-center">Lifestyle Sustainability Meter</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            {/* One-time Costs Funded */}
+            <div className="bg-white rounded-xl p-6 shadow-sm border border-green-100">
+              <div className="text-center mb-4">
+                <div className="bg-green-100 rounded-full p-3 w-12 h-12 flex items-center justify-center mx-auto mb-3">
+                  <Home className="w-6 h-6 text-green-600" />
+                </div>
+                <h4 className="font-semibold text-gray-900">One-time Costs Funded</h4>
+                <p className="text-sm text-gray-600">Property purchase capability</p>
+              </div>
+              
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Progress</span>
+                  <span className="font-bold text-green-700">{propertyProgress.toFixed(1)}%</span>
+                </div>
+                <div className="w-full bg-green-200 rounded-full h-3">
+                  <div 
+                    className="bg-green-600 h-3 rounded-full transition-all duration-2000 ease-out"
+                    style={{ 
+                      width: animationStarted ? `${Math.min(propertyProgress, 100)}%` : '0%' 
+                    }}
+                  ></div>
+                </div>
+                <div className="text-center">
+                  <div className="text-lg font-bold text-gray-900">{formatCurrency(currentPropertySaved)}</div>
+                  <div className="text-sm text-gray-600">of {formatCurrency(propertyTarget)} needed</div>
+                </div>
+                {propertyProgress >= 100 ? (
+                  <div className="bg-green-100 rounded-lg p-3 text-center">
+                    <div className="text-sm font-medium text-green-800">✅ Property purchase funded!</div>
+                  </div>
+                ) : (
+                  <div className="bg-gray-50 rounded-lg p-3 text-center">
+                    <div className="text-sm text-gray-700">
+                      <span className="font-medium">{formatCurrency(propertyTarget - currentPropertySaved)}</span> remaining
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Years of Lifestyle Secured */}
+            <div className="bg-white rounded-xl p-6 shadow-sm border border-blue-100">
+              <div className="text-center mb-4">
+                <div className="bg-blue-100 rounded-full p-3 w-12 h-12 flex items-center justify-center mx-auto mb-3">
+                  <Clock className="w-6 h-6 text-blue-600" />
+                </div>
+                <h4 className="font-semibold text-gray-900">Years of Lifestyle Secured</h4>
+                <p className="text-sm text-gray-600">Sustainable living capability</p>
+              </div>
+              
+              <div className="space-y-3">
+                {(() => {
+                  const yearsSecured = currentExpensesSaved / livingExpensesPerYear
+                  const yearsProgress = (yearsSecured / yearsOfExpenses) * 100
+                  
+                  return (
+                    <>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Progress</span>
+                        <span className="font-bold text-blue-700">{yearsProgress.toFixed(1)}%</span>
+                      </div>
+                      <div className="w-full bg-blue-200 rounded-full h-3">
+                        <div 
+                          className="bg-blue-600 h-3 rounded-full transition-all duration-2000 ease-out"
+                          style={{ 
+                            width: animationStarted ? `${Math.min(yearsProgress, 100)}%` : '0%' 
+                          }}
+                        ></div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-lg font-bold text-gray-900">{yearsSecured.toFixed(1)} years</div>
+                        <div className="text-sm text-gray-600">of {yearsOfExpenses} years needed</div>
+                      </div>
+                      {yearsSecured >= yearsOfExpenses ? (
+                        <div className="bg-blue-100 rounded-lg p-3 text-center">
+                          <div className="text-sm font-medium text-blue-800">✅ Lifestyle fully secured!</div>
+                        </div>
+                      ) : (
+                        <div className="bg-gray-50 rounded-lg p-3 text-center">
+                          <div className="text-sm text-gray-700">
+                            <span className="font-medium">{formatCurrency((yearsOfExpenses - yearsSecured) * livingExpensesPerYear)}</span> more needed<br/>
+                            <span className="text-xs">for full {yearsOfExpenses}-year security</span>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )
+                })()}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom Stats */}
+      <div className="mt-6 pt-6 border-t border-green-200">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
           <div className="bg-white rounded-lg p-4 shadow-sm">
             <div className="text-2xl font-bold text-green-600">{formatCurrency(propertyTarget)}</div>
@@ -217,12 +318,15 @@ const SomedayLifeHero = ({
           </div>
           <div>
             <div className="font-medium text-blue-900 mb-1">
-              Complete Lifestyle, Not Just Retirement
+              Two Mathematical Problems, One Dream
             </div>
             <div className="text-sm text-blue-800">
-              This isn't just buying property — it's funding {yearsOfExpenses} years of your ideal lifestyle 
-              with {formatCurrency(livingExpensesPerYear)} annual living expenses. 
-              True financial freedom means never having to work again.
+              Your Someday Life requires solving two equations simultaneously:<br/>
+              <strong>1. Accumulation:</strong> Save {formatCurrency(propertyTarget)} to buy the cottage<br/>
+              <strong>2. Income Replacement:</strong> Build a {formatCurrency(totalLivingExpenses)} portfolio to generate {formatCurrency(livingExpensesPerYear)}/year forever (4% rule)<br/>
+              <span className="mt-2 block">
+                Having the cottage means nothing if you can't afford to live there indefinitely.
+              </span>
             </div>
           </div>
         </div>

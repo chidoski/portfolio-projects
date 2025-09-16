@@ -34,6 +34,8 @@ import { useIntersectionObserver } from './utils/useIntersectionObserver'
 import { useCountUp } from './utils/useCountUp'
 // @ts-ignore - demoData.js doesn't have TypeScript declarations
 import { getDemoUser } from './services/demoData'
+// @ts-ignore - psychProfileUtils.js doesn't have TypeScript declarations
+import { getTextVariants, getUserPsychProfile } from './utils/psychProfileUtils'
 
 type View = 'welcome' | 'detailed' | 'builder' | 'calculator' | 'dashboard' | 'quickstart' | 'dreamcreator' | 'financialwizard' | 'somedaybuilder' | 'zerobasedplanner' | 'spendingdemo' | 'incomeaccelerator' | 'errortest'
 
@@ -286,6 +288,7 @@ function App() {
           highlightedDreamId={urlParams.dreamId}
           onNavigateToZeroBasedPlanner={() => navigateTo('zerobasedplanner')}
           onNavigateToIncomeAccelerator={() => navigateTo('incomeaccelerator')}
+          onNavigateToSomedayLifeBuilder={() => navigateTo('somedaybuilder')}
         />
       case 'quickstart':
         return <QuickStart 
@@ -461,6 +464,8 @@ interface WelcomeScreenProps {
 }
 
 function WelcomeScreen({ onQuickStart, onSomedayBuilder, onShowTools, onNavigateToSomedayBuilder, onBackToMinimal }: WelcomeScreenProps) {
+  const userProfile = getUserPsychProfile()
+  
   const dreamEquivalents = [
     '$50,000 vacation = Skip one coffee daily',
     '$30,000 car = One less streaming service', 
@@ -542,12 +547,12 @@ function WelcomeScreen({ onQuickStart, onSomedayBuilder, onShowTools, onNavigate
           </div>
           
           <h1 className="text-6xl font-bold mb-4 text-balance" style={{ fontWeight: 700, color: '#2D3748' }}>
-            Transform Retirement Planning Into
-            <span style={{ color: '#0B7A75' }}> Life Planning</span>
+            {getTextVariants('welcomeTitle', 'Transform Retirement Planning Into')}
+            <span style={{ color: '#0B7A75' }}> {userProfile ? (userProfile === 'dreamer' ? 'Life Planning' : userProfile === 'validator' ? 'Security Planning' : 'Clear Planning') : 'Life Planning'}</span>
           </h1>
           
           <p className="text-xl text-gray-600 mb-6 max-w-2xl mx-auto text-balance">
-            See how your dreams become achievable through daily actions.
+            {getTextVariants('welcomeSubtitle', 'See how your dreams become achievable through daily actions.')}
             <br />
             <span className="transition-opacity duration-500 text-lg text-gray-500 mt-2 block">
               {dreamEquivalents[currentEquivalent]}
@@ -569,7 +574,7 @@ function WelcomeScreen({ onQuickStart, onSomedayBuilder, onShowTools, onNavigate
                 (e.target as HTMLButtonElement).style.backgroundColor = '#0B7A75';
               }}
             >
-              Start Planning Your Future
+              {getTextVariants('welcomePrimaryCTA', 'Start Planning Your Future')}
             </button>
             
             <button
@@ -753,7 +758,7 @@ function WelcomeScreen({ onQuickStart, onSomedayBuilder, onShowTools, onNavigate
                 (e.target as HTMLButtonElement).style.backgroundColor = '#0B7A75';
               }}
             >
-              Start My Plan
+{getTextVariants('primaryCTA', 'Start My Plan')}
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
               </svg>
@@ -831,7 +836,7 @@ function WelcomeScreen({ onQuickStart, onSomedayBuilder, onShowTools, onNavigate
                   (e.target as HTMLButtonElement).style.backgroundColor = '#0B7A75';
                 }}
               >
-                Start Planning Your Future
+{getTextVariants('welcomePrimaryCTA', 'Start Planning Your Future')}
               </button>
               
               <button

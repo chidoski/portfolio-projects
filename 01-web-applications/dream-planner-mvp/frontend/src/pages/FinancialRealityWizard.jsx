@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { FinancialProfile, FinancialObligations, Debt } from '../models/FinancialProfile.js';
 import { Heart, DollarSign, Car, CreditCard, GraduationCap, Calculator, CheckCircle, AlertCircle, ArrowRight, ArrowLeft, Home, Zap, Shield, ShoppingCart, Fuel, TrendingUp } from 'lucide-react';
 import DebtOptimizationDisplay from '../components/DebtOptimizationDisplay.jsx';
+import { getFinancialRealityContent } from '../utils/adaptiveContent';
+import { AIConfidenceBadge } from '../components/AIInsight';
 
 const FinancialRealityWizard = ({ onComplete, onBack }) => {
   const [currentStep, setCurrentStep] = useState(0);
@@ -832,14 +834,13 @@ const FinancialRealityWizard = ({ onComplete, onBack }) => {
       </div>
       
       <h1 className="text-4xl font-bold text-gray-800 mb-6">
-        Let's understand what you're working with today
+        {getFinancialRealityContent('pageTitle', 'Let\'s understand what you\'re working with today')}
       </h1>
       
       <p className="text-xl text-gray-600 mb-8 leading-relaxed">
         <span className="font-semibold text-blue-600">No judgment, just math.</span>
         <br />
-        Understanding your current obligations helps us create a realistic path to your dreams.
-        Every successful journey starts with knowing where you are.
+        {getFinancialRealityContent('pageSubtitle', 'Understanding your current obligations helps us create a realistic path to your dreams. Every successful journey starts with knowing where you are.')}
       </p>
       
       <div className="bg-blue-50 rounded-xl p-6 mb-8">

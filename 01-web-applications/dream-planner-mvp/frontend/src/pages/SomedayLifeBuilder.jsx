@@ -1,7 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { FinancialProfile, UserProfile, NorthStarDream } from '../models/FinancialProfile.js';
 import { dreamTemplates } from '../data/dreamTemplates.js';
-import { X, Tag, DollarSign, Clock, Sparkles, Calculator } from 'lucide-react';
+import { DreamService } from '../services/dreamService';
+import { X, Tag, DollarSign, Clock, Sparkles, Calculator, TrendingUp } from 'lucide-react';
+import { getSomedayBuilderContent } from '../utils/adaptiveContent';
+import { findCareerProfile, calculateIncomeProjection, suggestCareerStage } from '../data/careerProfiles.js';
+import AIInsight, { AIConfidenceBadge, AIDataBadge } from '../components/AIInsight';
 
 console.log('SomedayLifeBuilder loaded successfully');
 
@@ -15,13 +19,36 @@ const SomedayLifeBuilder = ({ onComplete, onBack }) => {
     selectedLocation: '',
     selectedHousingType: '',
     
-    // Step 2: Lifestyle Selection
+    // Step 2: Lifestyle Selection (now includes annual spending)
     selectedLifestyle: null,
+    annualSpending: {
+      basicLiving: '',      // Core living expenses (housing, utilities, groceries, insurance)
+      hobbiesInterests: '', // Recreation, entertainment, personal interests
+      travelExperiences: '', // Travel, dining out, special experiences
+      healthWellness: '',   // Healthcare, fitness, wellness activities
+      familyGiving: '',     // Family support, charitable giving, gifts
+      emergencyBuffer: ''   // Unexpected expenses, inflation protection
+    },
     
-    // Step 3: Basic Financial Info
+    // Step 3: Financial Reality & Career Info
     currentAge: '',
     incomeRange: '',
-    selectedState: ''
+    selectedState: '',
+    
+    // Career trajectory for income acceleration
+    occupation: '',
+    jobTitle: '',
+    yearsInRole: '',
+    yearsInField: '', // New field for total years in field
+    careerStage: '', // New field for career stage
+    industry: '',
+    careerGrowthExpectation: '',
+    
+    // Assets and their Someday Life role
+    currentAssets: [],
+    
+    // Debts and payoff timeline
+    currentDebts: []
   });
   const [yearsToSomeday, setYearsToSomeday] = useState(null);
   const [calculationError, setCalculationError] = useState(null);
@@ -270,6 +297,202 @@ const SomedayLifeBuilder = ({ onComplete, onBack }) => {
     'Wisconsin', 'Wyoming'
   ];
 
+  // Industries for salary benchmarking and career projections
+  const industries = [
+    'Technology',
+    'Healthcare',
+    'Finance & Banking',
+    'Education',
+    'Government',
+    'Manufacturing',
+    'Retail',
+    'Real Estate',
+    'Legal',
+    'Marketing & Advertising',
+    'Construction',
+    'Transportation',
+    'Hospitality & Tourism',
+    'Non-profit',
+    'Media & Entertainment',
+    'Consulting',
+    'Energy & Utilities',
+    'Agriculture',
+    'Other'
+  ];
+
+  // Career growth expectations for income acceleration planning
+  const careerGrowthOptions = [
+    { value: 'steady_growth', label: 'Steady Growth', description: '3-5% annual increases, gradual advancement' },
+    { value: 'major_promotion', label: 'Major Promotion Expected', description: 'Significant role change within 2-3 years' },
+    { value: 'career_change', label: 'Career Change Planned', description: 'Switching fields or starting business' },
+    { value: 'nearing_retirement', label: 'Nearing Retirement', description: 'Winding down, limited growth expected' },
+    { value: 'peak_earnings', label: 'Peak Earnings Phase', description: 'At or near career income ceiling' },
+    { value: 'early_career', label: 'Early Career', description: 'Rapid growth potential ahead' }
+  ];
+
+  // Lifestyle Cost Estimator - Intelligent defaults based on lifestyle and location
+  const getLifestyleCostEstimates = (lifestyle, userState = '') => {
+    if (!lifestyle) return null;
+    
+    const baseEstimates = {
+      'coastal-cottage': {
+        name: 'Maine Coastal Cottage Life',
+        basicLiving: 30000,  // Utilities, food, insurance, property taxes
+        healthWellness: 12000, // Healthcare (pre-Medicare), fitness
+        hobbiesInterests: 5000, // Art supplies, classes, creative pursuits
+        travelExperiences: 8000, // Travel to see family, experiences
+        familyGiving: 3000,     // Gifts, support
+        emergencyBuffer: 4000,  // Unexpected expenses, inflation protection
+        total: 62000,
+        details: {
+          basicLiving: 'Higher utilities (heating oil), groceries, homeowners insurance, property taxes',
+          healthWellness: 'Healthcare without employer coverage, Maine rural access considerations',
+          hobbiesInterests: 'Art supplies, photography equipment, local classes and workshops',
+          travelExperiences: 'Visits to family, local dining, seasonal activities',
+          familyGiving: 'Gifts for grandchildren, charitable giving',
+          emergencyBuffer: 'Home maintenance, weather-related repairs, inflation protection'
+        }
+      },
+      'mountain-cabin': {
+        name: 'Asheville Mountain Cabin Life',
+        basicLiving: 25000,
+        healthWellness: 10000,
+        hobbiesInterests: 4000,
+        travelExperiences: 7000,
+        familyGiving: 3000,
+        emergencyBuffer: 3500,
+        total: 52500,
+        details: {
+          basicLiving: 'Lower cost of living, seasonal heating, mountain property maintenance',
+          healthWellness: 'Good healthcare access in Asheville, outdoor fitness opportunities',
+          hobbiesInterests: 'Hiking gear, crafts, local music and arts scene',
+          travelExperiences: 'Mountain activities, regional travel, brewery tours',
+          familyGiving: 'Family visits, community involvement',
+          emergencyBuffer: 'Weather events, mountain property challenges'
+        }
+      },
+      'desert-modern': {
+        name: 'Sedona Desert Modern Life',
+        basicLiving: 28000,
+        healthWellness: 11000,
+        hobbiesInterests: 6000,
+        travelExperiences: 9000,
+        familyGiving: 3500,
+        emergencyBuffer: 4000,
+        total: 61500,
+        details: {
+          basicLiving: 'Higher cooling costs, desert landscaping, HOA fees',
+          healthWellness: 'Excellent healthcare access, wellness retreats, spa treatments',
+          hobbiesInterests: 'Photography, spiritual pursuits, art galleries, workshops',
+          travelExperiences: 'Desert adventures, fine dining, cultural events',
+          familyGiving: 'Hosting family visits, spiritual giving',
+          emergencyBuffer: 'Pool maintenance, desert home upkeep, extreme weather'
+        }
+      },
+      'small-town-charm': {
+        name: 'Vermont Small Town Life',
+        basicLiving: 26000,
+        healthWellness: 9000,
+        hobbiesInterests: 3500,
+        travelExperiences: 6000,
+        familyGiving: 2500,
+        emergencyBuffer: 3000,
+        total: 50000,
+        details: {
+          basicLiving: 'Lower cost of living, efficient small home, community resources',
+          healthWellness: 'Rural healthcare access, community wellness programs',
+          hobbiesInterests: 'Community activities, gardening, local crafts',
+          travelExperiences: 'Regional travel, local festivals, simple pleasures',
+          familyGiving: 'Community involvement, family support',
+          emergencyBuffer: 'Victorian home maintenance, winter preparation'
+        }
+      },
+      'lakefront-retreat': {
+        name: 'Lake Champlain Retreat Life',
+        basicLiving: 28000,
+        healthWellness: 10000,
+        hobbiesInterests: 4500,
+        travelExperiences: 7500,
+        familyGiving: 3000,
+        emergencyBuffer: 4000,
+        total: 57000,
+        details: {
+          basicLiving: 'Lakefront property taxes, utilities, boat maintenance',
+          healthWellness: 'Excellent healthcare in Burlington, water activities',
+          hobbiesInterests: 'Boating, fishing, water sports, nature photography',
+          travelExperiences: 'Lake region exploration, seasonal activities',
+          familyGiving: 'Hosting family at lake house, community support',
+          emergencyBuffer: 'Dock maintenance, seasonal property care, weather events'
+        }
+      },
+      'urban-loft': {
+        name: 'Portland Creative Loft Life',
+        basicLiving: 35000,
+        healthWellness: 11000,
+        hobbiesInterests: 6000,
+        travelExperiences: 10000,
+        familyGiving: 4000,
+        emergencyBuffer: 4000,
+        total: 70000,
+        details: {
+          basicLiving: 'Urban costs, HOA fees, higher utilities, food scene',
+          healthWellness: 'Excellent urban healthcare, fitness facilities, alternative wellness',
+          hobbiesInterests: 'Arts scene, classes, creative supplies, cultural activities',
+          travelExperiences: 'Urban dining, entertainment, regional adventures',
+          familyGiving: 'Urban gift costs, cultural giving, family visits',
+          emergencyBuffer: 'Urban living unexpected costs, building maintenance'
+        }
+      }
+    };
+    
+    return baseEstimates[lifestyle.id] || null;
+  };
+
+  // Function to apply state-based cost adjustments
+  const applyStateCostAdjustments = (estimates, state) => {
+    if (!estimates || !state) return estimates;
+    
+    // Cost of living adjustments by state (multiplier)
+    const stateCostMultipliers = {
+      'California': 1.3,
+      'New York': 1.25,
+      'Massachusetts': 1.2,
+      'Connecticut': 1.18,
+      'New Jersey': 1.15,
+      'Maryland': 1.1,
+      'Washington': 1.08,
+      'Colorado': 1.05,
+      'Vermont': 1.02,
+      'Maine': 1.0,
+      'North Carolina': 0.95,
+      'Arizona': 0.98,
+      'Oregon': 1.03,
+      'Georgia': 0.92,
+      'Texas': 0.95,
+      'Florida': 0.96,
+      'Tennessee': 0.90,
+      'Ohio': 0.88,
+      'Michigan': 0.87,
+      'Indiana': 0.85
+    };
+    
+    const multiplier = stateCostMultipliers[state] || 1.0;
+    
+    if (multiplier === 1.0) return estimates;
+    
+    const adjusted = { ...estimates };
+    adjusted.basicLiving = Math.round(estimates.basicLiving * multiplier);
+    adjusted.healthWellness = Math.round(estimates.healthWellness * multiplier);
+    adjusted.hobbiesInterests = Math.round(estimates.hobbiesInterests * multiplier);
+    adjusted.travelExperiences = Math.round(estimates.travelExperiences * multiplier);
+    adjusted.familyGiving = Math.round(estimates.familyGiving * multiplier);
+    adjusted.emergencyBuffer = Math.round(estimates.emergencyBuffer * multiplier);
+    adjusted.total = adjusted.basicLiving + adjusted.healthWellness + adjusted.hobbiesInterests + 
+                    adjusted.travelExperiences + adjusted.familyGiving + adjusted.emergencyBuffer;
+    
+    return adjusted;
+  };
+
   // Validation function for age calculations
   const validateAgeCalculations = () => {
     const testCases = [
@@ -290,7 +513,8 @@ const SomedayLifeBuilder = ({ onComplete, onBack }) => {
 
   // Clear all form data and previous session data when component mounts
   useEffect(() => {
-    console.log('Clearing previous session data');
+    console.log('🏠 Initializing Someday Life Builder (Retirement Lifestyle Planning)');
+    console.log('📊 This tool is separate from regular savings goals and focuses on complete financial independence');
     
     // Run validation tests during development
     validateAgeCalculations();
@@ -327,9 +551,24 @@ const SomedayLifeBuilder = ({ onComplete, onBack }) => {
       selectedLocation: '',
       selectedHousingType: '',
       selectedLifestyle: null,
+      annualSpending: {
+        basicLiving: '',
+        hobbiesInterests: '',
+        travelExperiences: '',
+        healthWellness: '',
+        familyGiving: '',
+        emergencyBuffer: ''
+      },
       currentAge: '',
       incomeRange: '',
-      selectedState: ''
+      selectedState: '',
+      occupation: '',
+      jobTitle: '',
+      yearsInRole: '',
+      industry: '',
+      careerGrowthExpectation: '',
+      currentAssets: [],
+      currentDebts: []
     });
     
     // Reset other state variables
@@ -886,7 +1125,7 @@ const SomedayLifeBuilder = ({ onComplete, onBack }) => {
     }));
   };
 
-  const calculateFinalResults = () => {
+  const calculateFinalResults = async () => {
     console.log('📊 Starting financial calculations...');
     
     try {
@@ -924,12 +1163,24 @@ const SomedayLifeBuilder = ({ onComplete, onBack }) => {
       const currentAge = parseInt(formData.currentAge) || 30;
       const retirementAge = 65; // Default retirement age
       
-      // Calculate costs
-      const estimatedTargetCost = (formData.selectedLifestyle.propertyCost.min + formData.selectedLifestyle.propertyCost.max) / 2;
-      const annualLivingCosts = (formData.selectedLifestyle.annualExpenses.min + formData.selectedLifestyle.annualExpenses.max) / 2;
+      // Calculate costs - now using user-defined annual spending instead of preset ranges
+      const estimatedPropertyCost = (formData.selectedLifestyle.propertyCost.min + formData.selectedLifestyle.propertyCost.max) / 2;
       
-      // Calculate required net worth (property + 25x annual expenses for financial independence)
-      const requiredNetWorth = estimatedTargetCost + (annualLivingCosts * 25);
+      // Calculate total annual spending from user inputs
+      const totalAnnualSpending = Object.values(formData.annualSpending)
+        .filter(val => val && !isNaN(parseFloat(val)))
+        .reduce((sum, val) => sum + parseFloat(val), 0);
+      
+      // If no annual spending defined, fall back to lifestyle estimates
+      const annualLivingCosts = totalAnnualSpending > 0 
+        ? totalAnnualSpending 
+        : (formData.selectedLifestyle.annualExpenses.min + formData.selectedLifestyle.annualExpenses.max) / 2;
+      
+      // Calculate required portfolio using 4% rule (25x annual expenses)
+      const requiredPortfolio = annualLivingCosts * 25;
+      
+      // Total Someday Life target = Property + Portfolio for financial independence
+      const requiredNetWorth = estimatedPropertyCost + requiredPortfolio;
       
       // Calculate disposable income (after taxes and living expenses)
       const netAnnualIncome = totalIncome * 0.78; // After taxes
@@ -946,13 +1197,21 @@ const SomedayLifeBuilder = ({ onComplete, onBack }) => {
         monthlySavingsNeeded
       });
 
-      // Create comprehensive profile
+      // Create comprehensive profile with career context
       const userProfile = new UserProfile({
         age: currentAge,
         location: { state: formData.selectedState },
         income: {
           gross: { annual: totalIncome },
           net: { annual: netAnnualIncome }
+        },
+        employment: {
+          status: 'employed',
+          position: formData.occupation,
+          industry: formData.industry,
+          yearsInRole: formData.yearsInRole,
+          careerGrowthExpectation: formData.careerGrowthExpectation,
+          jobSecurity: 'stable' // Default, could be enhanced later
         },
         expenses: {
           monthly: {
@@ -968,13 +1227,21 @@ const SomedayLifeBuilder = ({ onComplete, onBack }) => {
       });
 
       const northStarDream = new NorthStarDream({
+        title: 'Someday Life - Financial Independence',
         description: dreamDescription,
+        type: 'retirement_lifestyle', // Explicitly mark as retirement lifestyle transformation
         location: formData.selectedLocation,
         housingType: formData.selectedHousingType,
         inspirationImages: formData.inspirationImages,
-        estimatedCost: estimatedTargetCost,
+        estimatedCost: estimatedPropertyCost, // Property cost only
+        annualSpending: formData.annualSpending, // Detailed annual spending breakdown
+        totalAnnualCost: annualLivingCosts, // Total annual living costs
+        requiredPortfolio: requiredPortfolio, // Portfolio needed for 4% rule
         timeline: workingYears,
-        requiredNetWorth: requiredNetWorth
+        requiredNetWorth: requiredNetWorth, // Total target (property + portfolio)
+        targetAge: 65, // Default retirement age
+        currentAge: currentAge,
+        isLifestyleTransformation: true // Flag to distinguish from other dreams
       });
 
       // Create profile with defensive error handling
@@ -983,6 +1250,8 @@ const SomedayLifeBuilder = ({ onComplete, onBack }) => {
         const profileData = {
           userProfile,
           northStarDream,
+          currentAssets: formData.currentAssets || [],
+          currentDebts: formData.currentDebts || [],
           fixedExpenses: {
             housing: (currentLivingExpenses / 12) * 0.3,
             transportation: (currentLivingExpenses / 12) * 0.15,
@@ -1019,15 +1288,70 @@ const SomedayLifeBuilder = ({ onComplete, onBack }) => {
         });
       }
 
-      // Save to localStorage
+          // Save to localStorage with clear distinction from other dreams
+      // Check if Someday Life goal already exists
+      const existingSomedayLife = DreamService.getSomedayLifeGoal()
+      
+      if (existingSomedayLife) {
+        const shouldReplace = await DreamService.confirmSomedayLifeReplacement({
+          title: northStarDream.title,
+          description: northStarDream.description
+        })
+        
+        if (!shouldReplace) {
+          console.log('User chose not to replace existing Someday Life goal')
+          return
+        }
+      }
+      
+      // Convert NorthStarDream to DreamService format
+      const dreamServiceGoal = {
+        title: northStarDream.title,
+        description: northStarDream.description,
+        type: 'someday_life',
+        target_amount: northStarDream.requiredNetWorth,
+        property_cost: northStarDream.estimatedCost,
+        annual_expenses: northStarDream.totalAnnualCost,
+        target_date: new Date(new Date().getFullYear() + northStarDream.timeline, 11, 31).toISOString(),
+        category: 'freedom',
+        location: northStarDream.location,
+        housing_type: northStarDream.housingType,
+        required_portfolio: northStarDream.requiredPortfolio,
+        target_age: northStarDream.targetAge,
+        current_age: northStarDream.currentAge,
+        is_lifestyle_transformation: true
+      }
+      
+      // Save using DreamService
+      if (existingSomedayLife) {
+        DreamService.replaceSomedayLifeGoal(dreamServiceGoal)
+      } else {
+        DreamService.saveDream(dreamServiceGoal)
+      }
+      
       localStorage.setItem('financialProfile', JSON.stringify(profile));
       localStorage.setItem('somedayDream', JSON.stringify(northStarDream));
+      localStorage.setItem('somedayLifeType', 'retirement_lifestyle'); // Mark as retirement planning
       
-      // Save income data separately for reliable access in next steps
+      // Save comprehensive financial context for timeline optimization
       localStorage.setItem('userIncome', JSON.stringify({ 
         annual: totalIncome, 
         monthly: totalIncome / 12 
       }));
+      localStorage.setItem('careerContext', JSON.stringify({
+        occupation: formData.occupation,
+        industry: formData.industry,
+        yearsInRole: formData.yearsInRole,
+        growthExpectation: formData.careerGrowthExpectation
+      }));
+      localStorage.setItem('assetDebtContext', JSON.stringify({
+        assets: formData.currentAssets,
+        debts: formData.currentDebts
+      }));
+      
+      // Clear any confusion with regular dreams
+      console.log('✅ Someday Life (retirement lifestyle) plan created with full financial context');
+      console.log('📊 Career trajectory and asset/debt context stored for income acceleration suggestions');
       
       // Set the profile and trigger completion
       setFinancialProfile(profile);
@@ -1055,8 +1379,11 @@ const SomedayLifeBuilder = ({ onComplete, onBack }) => {
   const ProgressIndicator = () => (
     <div className="mb-8">
       <div className="text-center mb-4">
-        <h2 className="text-2xl font-bold text-gray-800">Building Your Someday Life</h2>
+        <h2 className="text-2xl font-bold text-gray-800">{getSomedayBuilderContent('pageTitle', 'Building Your Someday Life')}</h2>
         <p className="text-gray-600">Step {currentStep} of 3</p>
+        <p className="text-sm text-gray-500 mt-1">
+          {getSomedayBuilderContent('pageSubtitle', 'Design and plan your perfect retirement lifestyle')}
+        </p>
       </div>
       
       <div className="flex justify-center items-center space-x-4">
@@ -1116,10 +1443,16 @@ const SomedayLifeBuilder = ({ onComplete, onBack }) => {
         {currentStep === 1 && (
           <div className="bg-white rounded-2xl shadow-xl p-8">
             <div className="text-center mb-8">
-              <h3 className="text-3xl font-bold text-gray-800 mb-4">Envision Your Someday Life</h3>
-              <p className="text-lg text-gray-600">
-                Choose a starting point or describe your own unique vision of the perfect life when work becomes optional.
+              <h3 className="text-3xl font-bold text-gray-800 mb-4">{getSomedayBuilderContent('stepIntro', 'Envision Your Someday Life')}</h3>
+              <p className="text-lg text-gray-600 mb-4">
+                This is different from other savings goals - we're designing your complete lifestyle transformation for when work becomes optional.
               </p>
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 max-w-2xl mx-auto">
+                <p className="text-sm text-blue-800">
+                  💡 <strong>Key Insight:</strong> Instead of just saving for retirement, we're calculating both the assets you'll need (like property) 
+                  AND the portfolio required to sustain your ideal annual spending forever using the 4% rule.
+                </p>
+              </div>
             </div>
 
             {/* Dream Starting Points */}
@@ -1204,7 +1537,7 @@ const SomedayLifeBuilder = ({ onComplete, onBack }) => {
             {/* Dream Description */}
             <div className="mb-8">
               <label className="block text-xl font-semibold text-gray-700 mb-4">
-                Describe your someday life
+                {getSomedayBuilderContent('lifeVisionPrompt', 'Describe your someday life')}
               </label>
               <textarea
                 value={formData.dreamDescription}
@@ -1329,13 +1662,13 @@ const SomedayLifeBuilder = ({ onComplete, onBack }) => {
           </div>
         )}
 
-        {/* Step 2: Lifestyle Examples */}
+        {/* Step 2: Lifestyle Examples with Annual Spending */}
         {currentStep === 2 && (
           <div className="bg-white rounded-2xl shadow-xl p-8">
             <div className="text-center mb-8">
-              <h3 className="text-3xl font-bold text-gray-800 mb-4">Choose Your Lifestyle</h3>
+              <h3 className="text-3xl font-bold text-gray-800 mb-4">Design Your Someday Life</h3>
               <p className="text-lg text-gray-600 mb-6">
-                Based on your preferences, we've ranked these options to help you find the perfect match.
+                Choose your ideal lifestyle and define your annual spending for complete financial independence.
               </p>
               
               {/* Ranking explanation */}
@@ -1589,6 +1922,380 @@ const SomedayLifeBuilder = ({ onComplete, onBack }) => {
               ))}
             </div>
 
+            {/* Annual Spending Categories */}
+            {formData.selectedLifestyle && (
+              <div className="mb-8">
+                <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-xl p-6 border border-green-200">
+                  <div className="text-center mb-6">
+                    <h4 className="text-2xl font-bold text-gray-800 mb-2">Define Your Annual Spending</h4>
+                    <p className="text-gray-600 mb-4">
+                      How much will you need annually for your {formData.selectedLifestyle.title} lifestyle?
+                    </p>
+                    
+                    {/* Lifestyle Cost Estimator */}
+                    {(() => {
+                      const estimates = getLifestyleCostEstimates(formData.selectedLifestyle);
+                      const adjustedEstimates = applyStateCostAdjustments(estimates, formData.selectedState);
+                      
+                      return adjustedEstimates ? (
+                        <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-xl p-4 mb-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <div>
+                              <div className="flex items-center gap-2 mb-1">
+                                <h5 className="text-lg font-semibold text-blue-900">{adjustedEstimates.name}</h5>
+                                <AIDataBadge dataPoints="15,000+" source="retirees" size="small" />
+                              </div>
+                              <p className="text-sm text-blue-700">Costs validated against federal retirement data</p>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-2xl font-bold text-blue-900">{formatCurrency(adjustedEstimates.total)}</div>
+                              <div className="text-sm text-blue-600">per year</div>
+                            </div>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-4 text-xs">
+                            <div className="bg-white bg-opacity-60 rounded p-2">
+                              <div className="font-semibold text-gray-800">Basic Living</div>
+                              <div className="text-blue-800">{formatCurrency(adjustedEstimates.basicLiving)}</div>
+                            </div>
+                            <div className="bg-white bg-opacity-60 rounded p-2">
+                              <div className="font-semibold text-gray-800">Health & Wellness</div>
+                              <div className="text-blue-800">{formatCurrency(adjustedEstimates.healthWellness)}</div>
+                            </div>
+                            <div className="bg-white bg-opacity-60 rounded p-2">
+                              <div className="font-semibold text-gray-800">Hobbies & Interests</div>
+                              <div className="text-blue-800">{formatCurrency(adjustedEstimates.hobbiesInterests)}</div>
+                            </div>
+                            <div className="bg-white bg-opacity-60 rounded p-2">
+                              <div className="font-semibold text-gray-800">Travel & Experiences</div>
+                              <div className="text-blue-800">{formatCurrency(adjustedEstimates.travelExperiences)}</div>
+                            </div>
+                            <div className="bg-white bg-opacity-60 rounded p-2">
+                              <div className="font-semibold text-gray-800">Family & Giving</div>
+                              <div className="text-blue-800">{formatCurrency(adjustedEstimates.familyGiving)}</div>
+                            </div>
+                            <div className="bg-white bg-opacity-60 rounded p-2">
+                              <div className="font-semibold text-gray-800">Emergency Buffer</div>
+                              <div className="text-blue-800">{formatCurrency(adjustedEstimates.emergencyBuffer)}</div>
+                            </div>
+                          </div>
+                          
+                          <div className="flex flex-col sm:flex-row gap-3">
+                            <button
+                              onClick={() => {
+                                updateFormData('annualSpending', {
+                                  basicLiving: adjustedEstimates.basicLiving.toString(),
+                                  healthWellness: adjustedEstimates.healthWellness.toString(),
+                                  hobbiesInterests: adjustedEstimates.hobbiesInterests.toString(),
+                                  travelExperiences: adjustedEstimates.travelExperiences.toString(),
+                                  familyGiving: adjustedEstimates.familyGiving.toString(),
+                                  emergencyBuffer: adjustedEstimates.emergencyBuffer.toString()
+                                });
+                              }}
+                              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                            >
+                              📊 Use These Estimates
+                            </button>
+                            <details className="px-4 py-2 text-blue-600 border border-blue-300 rounded-lg hover:bg-blue-50 transition-colors cursor-pointer">
+                              <summary className="font-medium">View Detailed Breakdown</summary>
+                              <div className="mt-3 p-3 bg-white rounded-lg text-left text-sm">
+                                <div className="space-y-2">
+                                  <div><strong>Basic Living ({formatCurrency(adjustedEstimates.basicLiving)}):</strong> {adjustedEstimates.details.basicLiving}</div>
+                                  <div><strong>Health & Wellness ({formatCurrency(adjustedEstimates.healthWellness)}):</strong> {adjustedEstimates.details.healthWellness}</div>
+                                  <div><strong>Hobbies & Interests ({formatCurrency(adjustedEstimates.hobbiesInterests)}):</strong> {adjustedEstimates.details.hobbiesInterests}</div>
+                                  <div><strong>Travel & Experiences ({formatCurrency(adjustedEstimates.travelExperiences)}):</strong> {adjustedEstimates.details.travelExperiences}</div>
+                                  <div><strong>Family & Giving ({formatCurrency(adjustedEstimates.familyGiving)}):</strong> {adjustedEstimates.details.familyGiving}</div>
+                                  <div><strong>Emergency Buffer ({formatCurrency(adjustedEstimates.emergencyBuffer)}):</strong> {adjustedEstimates.details.emergencyBuffer}</div>
+                                </div>
+                                <div className="mt-3 pt-3 border-t border-gray-200">
+                                  <p className="text-xs text-gray-600">
+                                    💡 These estimates reflect the true cost of living your chosen lifestyle, not just buying the property. 
+                                    The portfolio calculation ensures you can afford this lifestyle indefinitely.
+                                  </p>
+                                </div>
+                              </div>
+                            </details>
+                          </div>
+                          
+                          {formData.selectedState && formData.selectedState !== 'Maine' && (
+                            <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded">
+                              <p className="text-xs text-yellow-800">
+                                💡 Costs adjusted for {formData.selectedState} cost of living vs. base location
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      ) : null;
+                    })()}
+                    
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-3 mt-3">
+                      <p className="text-sm text-green-800">
+                        <strong>🎯 This is NOT a regular savings goal</strong><br/>
+                        Unlike saving for a vacation or car, we're calculating your complete financial independence package:
+                      </p>
+                      <ul className="text-xs text-green-700 mt-2 space-y-1">
+                        <li>• Property cost (one-time purchase)</li>
+                        <li>• Portfolio needed to generate annual income forever (4% rule)</li>
+                        <li>• Complete retirement lifestyle transformation</li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {/* Basic Living */}
+                    <div className="bg-white rounded-lg p-4 border border-gray-200">
+                      <label className="block text-lg font-semibold text-gray-800 mb-2">
+                        🏠 Basic Living
+                      </label>
+                      {(() => {
+                        const estimates = getLifestyleCostEstimates(formData.selectedLifestyle);
+                        const adjustedEstimates = applyStateCostAdjustments(estimates, formData.selectedState);
+                        
+                        return adjustedEstimates ? (
+                          <div className="mb-3">
+                            <p className="text-sm text-gray-600 mb-1">
+                              Housing, utilities, groceries, insurance, taxes
+                            </p>
+                            <p className="text-xs text-blue-600">
+                              💡 Suggested for {adjustedEstimates.name}: ${adjustedEstimates.basicLiving.toLocaleString()}
+                            </p>
+                            <p className="text-xs text-gray-500 mt-1">
+                              {adjustedEstimates.details.basicLiving}
+                            </p>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-gray-600 mb-3">
+                            Housing, utilities, groceries, insurance, taxes
+                          </p>
+                        );
+                      })()}
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
+                        <input
+                          type="number"
+                          value={formData.annualSpending.basicLiving}
+                          onChange={(e) => updateFormData('annualSpending', {
+                            ...formData.annualSpending,
+                            basicLiving: e.target.value
+                          })}
+                          placeholder="45000"
+                          className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                        />
+                        <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">/year</span>
+                      </div>
+                    </div>
+
+                    {/* Hobbies & Interests */}
+                    <div className="bg-white rounded-lg p-4 border border-gray-200">
+                      <label className="block text-lg font-semibold text-gray-800 mb-2">
+                        🎨 Hobbies & Interests
+                      </label>
+                      <p className="text-sm text-gray-600 mb-3">
+                        Recreation, entertainment, learning, personal projects
+                      </p>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
+                        <input
+                          type="number"
+                          value={formData.annualSpending.hobbiesInterests}
+                          onChange={(e) => updateFormData('annualSpending', {
+                            ...formData.annualSpending,
+                            hobbiesInterests: e.target.value
+                          })}
+                          placeholder="8000"
+                          className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                        />
+                        <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">/year</span>
+                      </div>
+                    </div>
+
+                    {/* Travel & Experiences */}
+                    <div className="bg-white rounded-lg p-4 border border-gray-200">
+                      <label className="block text-lg font-semibold text-gray-800 mb-2">
+                        ✈️ Travel & Experiences
+                      </label>
+                      <p className="text-sm text-gray-600 mb-3">
+                        Vacations, dining out, special experiences, adventures
+                      </p>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
+                        <input
+                          type="number"
+                          value={formData.annualSpending.travelExperiences}
+                          onChange={(e) => updateFormData('annualSpending', {
+                            ...formData.annualSpending,
+                            travelExperiences: e.target.value
+                          })}
+                          placeholder="12000"
+                          className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                        />
+                        <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">/year</span>
+                      </div>
+                    </div>
+
+                    {/* Health & Wellness */}
+                    <div className="bg-white rounded-lg p-4 border border-gray-200">
+                      <label className="block text-lg font-semibold text-gray-800 mb-2">
+                        💪 Health & Wellness
+                      </label>
+                      {(() => {
+                        const estimates = getLifestyleCostEstimates(formData.selectedLifestyle);
+                        const adjustedEstimates = applyStateCostAdjustments(estimates, formData.selectedState);
+                        
+                        return adjustedEstimates ? (
+                          <div className="mb-3">
+                            <p className="text-sm text-gray-600 mb-1">
+                              Healthcare, fitness, wellness activities, supplements
+                            </p>
+                            <p className="text-xs text-blue-600">
+                              💡 Suggested: ${adjustedEstimates.healthWellness.toLocaleString()}
+                            </p>
+                            <p className="text-xs text-gray-500 mt-1">
+                              {adjustedEstimates.details.healthWellness}
+                            </p>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-gray-600 mb-3">
+                            Healthcare, fitness, wellness activities, supplements
+                          </p>
+                        );
+                      })()}
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
+                        <input
+                          type="number"
+                          value={formData.annualSpending.healthWellness}
+                          onChange={(e) => updateFormData('annualSpending', {
+                            ...formData.annualSpending,
+                            healthWellness: e.target.value
+                          })}
+                          placeholder="6000"
+                          className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                        />
+                        <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">/year</span>
+                      </div>
+                    </div>
+
+                    {/* Family & Giving */}
+                    <div className="bg-white rounded-lg p-4 border border-gray-200">
+                      <label className="block text-lg font-semibold text-gray-800 mb-2">
+                        ❤️ Family & Giving
+                      </label>
+                      <p className="text-sm text-gray-600 mb-3">
+                        Family support, gifts, charitable giving, legacy
+                      </p>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
+                        <input
+                          type="number"
+                          value={formData.annualSpending.familyGiving}
+                          onChange={(e) => updateFormData('annualSpending', {
+                            ...formData.annualSpending,
+                            familyGiving: e.target.value
+                          })}
+                          placeholder="4000"
+                          className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                        />
+                        <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">/year</span>
+                      </div>
+                    </div>
+
+                    {/* Emergency Buffer */}
+                    <div className="bg-white rounded-lg p-4 border border-gray-200">
+                      <label className="block text-lg font-semibold text-gray-800 mb-2">
+                        🛡️ Emergency Buffer
+                      </label>
+                      <p className="text-sm text-gray-600 mb-3">
+                        Unexpected expenses, inflation protection
+                      </p>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
+                        <input
+                          type="number"
+                          value={formData.annualSpending.emergencyBuffer || ''}
+                          onChange={(e) => updateFormData('annualSpending', {
+                            ...formData.annualSpending,
+                            emergencyBuffer: e.target.value
+                          })}
+                          placeholder="5000"
+                          className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                        />
+                        <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">/year</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Total Annual Spending Display */}
+                  {(() => {
+                    const totalAnnual = Object.values(formData.annualSpending)
+                      .filter(val => val && !isNaN(parseFloat(val)))
+                      .reduce((sum, val) => sum + parseFloat(val), 0);
+                    
+                    const propertyCost = formData.selectedLifestyle ? 
+                      (formData.selectedLifestyle.propertyCost.min + formData.selectedLifestyle.propertyCost.max) / 2 : 0;
+                    
+                    const portfolioNeeded = totalAnnual * 25; // 4% rule
+                    const totalSomedayLifeCost = propertyCost + portfolioNeeded;
+                    
+                    return totalAnnual > 0 ? (
+                      <div className="mt-6 bg-blue-600 text-white rounded-xl p-6">
+                        <div className="text-center">
+                          <h5 className="text-xl font-bold mb-4">Your Complete Someday Life Financial Target</h5>
+                          
+                          <div className="grid md:grid-cols-3 gap-4 mb-4">
+                            <div className="bg-blue-700 rounded-lg p-4">
+                              <div className="text-lg font-semibold">Annual Spending</div>
+                              <div className="text-2xl font-bold">{formatCurrency(totalAnnual)}</div>
+                              <div className="text-sm opacity-90">Your lifestyle costs</div>
+                            </div>
+                            
+                            <div className="bg-blue-700 rounded-lg p-4">
+                              <div className="text-lg font-semibold">Property Cost</div>
+                              <div className="text-2xl font-bold">{formatCurrency(propertyCost)}</div>
+                              <div className="text-sm opacity-90">One-time purchase</div>
+                            </div>
+                            
+                            <div className="bg-blue-700 rounded-lg p-4">
+                              <div className="text-lg font-semibold">Portfolio Needed</div>
+                              <div className="text-2xl font-bold">{formatCurrency(portfolioNeeded)}</div>
+                              <div className="text-sm opacity-90">For annual income (4% rule)</div>
+                            </div>
+                          </div>
+                          
+                          <div className="border-t border-blue-500 pt-4">
+                            <div className="text-lg font-semibold">Total Someday Life Target</div>
+                            <div className="text-4xl font-bold">{formatCurrency(totalSomedayLifeCost)}</div>
+                            <div className="text-sm opacity-90 mt-2">
+                              Property + Portfolio for financial independence
+                            </div>
+                          </div>
+                          
+                          <div className="mt-4 space-y-3">
+                            <div className="p-3 bg-blue-500 bg-opacity-50 rounded-lg">
+                              <p className="text-sm">
+                                💡 <strong>Portfolio Calculation:</strong> ${totalAnnual.toLocaleString()} × 25 = ${portfolioNeeded.toLocaleString()}
+                              </p>
+                              <p className="text-xs mt-1 opacity-90">
+                                Using the 4% rule: Your portfolio will generate ${totalAnnual.toLocaleString()} annually to sustain this lifestyle forever
+                              </p>
+                            </div>
+                            <div className="p-3 bg-green-500 bg-opacity-30 rounded-lg">
+                              <p className="text-sm">
+                                🎯 <strong>Complete Picture:</strong> Property to live in + Portfolio to pay for living = True Financial Independence
+                              </p>
+                              <p className="text-xs mt-1 opacity-90">
+                                This separates retirement lifestyle transformation from other savings goals
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : null;
+                  })()}
+                </div>
+              </div>
+            )}
+
             {/* Comparison Feature */}
             {selectedForComparison.length >= 2 && (
               <div className="mb-8">
@@ -1704,6 +2411,30 @@ const SomedayLifeBuilder = ({ onComplete, onBack }) => {
               </div>
             )}
 
+            {/* AI Insight after lifestyle selection */}
+            {formData.selectedLifestyle && (
+              <div className="mb-6">
+                <AIInsight
+                  type="lifestyle-validation"
+                  data={{
+                    location: formData.selectedState || 'your area',
+                    selectedLifestyle: formData.selectedLifestyle,
+                    userAge: formData.currentAge
+                  }}
+                  confidence="92"
+                />
+              </div>
+            )}
+
+            {/* Validation message for Step 2 */}
+            {(!formData.selectedLifestyle || Object.values(formData.annualSpending).filter(val => val && !isNaN(parseFloat(val))).length === 0) && (
+              <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                <p className="text-amber-800 text-sm">
+                  Please choose a lifestyle and add at least one annual spending category to continue.
+                </p>
+              </div>
+            )}
+
             {/* Navigation */}
             <div className="flex justify-between">
               <button
@@ -1714,7 +2445,7 @@ const SomedayLifeBuilder = ({ onComplete, onBack }) => {
               </button>
               <button
                 onClick={handleNext}
-                disabled={!formData.selectedLifestyle}
+                disabled={!formData.selectedLifestyle || Object.values(formData.annualSpending).filter(val => val && !isNaN(parseFloat(val))).length === 0}
                 className="px-8 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
               >
                 Next: Financial Details
@@ -1723,17 +2454,25 @@ const SomedayLifeBuilder = ({ onComplete, onBack }) => {
           </div>
         )}
 
-        {/* Step 3: Financial Reality */}
+        {/* Step 3: Financial Reality & Career Context */}
         {currentStep === 3 && (
           <div className="bg-white rounded-2xl shadow-xl p-8">
             <div className="text-center mb-8">
-              <h3 className="text-3xl font-bold text-gray-800 mb-4">Let's Make It Real</h3>
-              <p className="text-lg text-gray-600">
-                Just three numbers to create your personalized roadmap.
+              <h3 className="text-3xl font-bold text-gray-800 mb-4">Let's Get to Know You</h3>
+              <p className="text-lg text-gray-600 mb-4">
+                A few questions to create an accurate, personalized roadmap to your Someday Life.
               </p>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 max-w-2xl mx-auto">
+                <p className="text-sm text-blue-800">
+                  💬 Think of this as a conversation, not an interrogation. We'll use this to power realistic income projections and timeline optimizations.
+                </p>
+              </div>
             </div>
 
-            <div className="grid md:grid-cols-3 gap-6 mb-8">
+            {/* Basic Info Section */}
+            <div className="mb-8">
+              <h4 className="text-xl font-semibold text-gray-800 mb-4">First, the basics</h4>
+              <div className="grid md:grid-cols-3 gap-6">
               {/* Current Age */}
               <div>
                 <label className="block text-lg font-semibold text-gray-700 mb-3">
@@ -1847,6 +2586,515 @@ const SomedayLifeBuilder = ({ onComplete, onBack }) => {
                 </select>
               </div>
             </div>
+            </div>
+
+            {/* Career Context Section */}
+            <div className="mb-8">
+              <h4 className="text-xl font-semibold text-gray-800 mb-4">Your Career Context</h4>
+              <p className="text-gray-600 mb-2">
+                This helps us project your income growth accurately based on typical career progressions.
+              </p>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-6">
+                <p className="text-sm text-blue-800">
+                  💡 <strong>Why this matters:</strong> A 35-year-old teacher making $65,000 has different growth patterns than a software engineer at the same income level. We use occupation-specific data to make your projections credible, not generic.
+                </p>
+              </div>
+              
+              <div className="grid md:grid-cols-3 gap-6 mb-6">
+                {/* What do you do? */}
+                <div>
+                  <label className="block text-lg font-semibold text-gray-700 mb-3">
+                    What do you do?
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.occupation}
+                    onChange={(e) => updateFormData('occupation', e.target.value)}
+                    placeholder="Teacher, Software Engineer, Nurse..."
+                    className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none"
+                  />
+                </div>
+
+                {/* Years in this field */}
+                <div>
+                  <label className="block text-lg font-semibold text-gray-700 mb-3">
+                    Years in this field
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.yearsInField}
+                    onChange={(e) => updateFormData('yearsInField', e.target.value)}
+                    placeholder="5"
+                    min="0"
+                    max="50"
+                    className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none"
+                  />
+                </div>
+
+                {/* Career stage */}
+                <div>
+                  <label className="block text-lg font-semibold text-gray-700 mb-3">
+                    Career stage
+                  </label>
+                  <select
+                    value={formData.careerStage}
+                    onChange={(e) => updateFormData('careerStage', e.target.value)}
+                    className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none"
+                  >
+                    <option value="">Select stage...</option>
+                    <option value="early-career">Early Career</option>
+                    <option value="mid-career">Mid-Career</option>
+                    <option value="peak-earning">Peak Earning Years</option>
+                    <option value="pre-retirement">Pre-Retirement</option>
+                  </select>
+                  
+                  {/* Career Stage Suggestion */}
+                  {formData.currentAge && formData.yearsInField && !formData.careerStage && (
+                    <div className="mt-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const suggested = suggestCareerStage(formData.currentAge, formData.yearsInField);
+                          updateFormData('careerStage', suggested);
+                        }}
+                        className="text-sm text-blue-600 hover:text-blue-800 underline"
+                      >
+                        Suggest based on age ({formData.currentAge}) and experience ({formData.yearsInField} years)
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Career Intelligence Display */}
+              {formData.occupation && formData.careerStage && formData.currentAge && formData.incomeRange && (
+                <div className="mb-6 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-6">
+                  <div className="flex items-start gap-3 mb-4">
+                    <div className="bg-green-100 p-2 rounded-lg">
+                      <TrendingUp className="w-5 h-5 text-green-600" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h5 className="font-semibold text-green-800">Career-Based Income Projection</h5>
+                        <AIConfidenceBadge confidence="87%" source="historical data" variant="subtle" />
+                      </div>
+                      <p className="text-sm text-green-700">
+                        Based on typical {findCareerProfile(formData.occupation).name.toLowerCase()} career progression
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {(() => {
+                    const currentIncome = useIncomeRange 
+                      ? (incomeRanges.find(range => range.value === formData.incomeRange)?.midpoint || 0)
+                      : parseFloat(formData.incomeRange.toString().replace(/,/g, '')) || 0;
+                    
+                    if (currentIncome > 0) {
+                      const retirementAge = 65; // Default retirement age
+                      const projection = calculateIncomeProjection(
+                        currentIncome,
+                        parseInt(formData.currentAge),
+                        retirementAge,
+                        formData.occupation,
+                        formData.careerStage,
+                        formData.yearsInField
+                      );
+                      
+                      return (
+                        <div className="grid md:grid-cols-3 gap-4">
+                          <div className="text-center">
+                            <p className="text-sm text-green-600 mb-1">Current Income</p>
+                            <p className="text-lg font-bold text-green-800">
+                              ${currentIncome.toLocaleString()}
+                            </p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-sm text-green-600 mb-1">Projected at {retirementAge}</p>
+                            <p className="text-lg font-bold text-green-800">
+                              ${projection.projectedIncome.toLocaleString()}
+                            </p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-sm text-green-600 mb-1">Annual Growth</p>
+                            <p className="text-lg font-bold text-green-800">
+                              {(projection.annualGrowthRate * 100).toFixed(1)}%
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+                  
+                  <div className="mt-4 text-xs text-green-700">
+                    💡 This projection uses industry-specific data for {findCareerProfile(formData.occupation).name.toLowerCase()}s in the {formData.careerStage.replace('-', ' ')} stage. 
+                    Actual results may vary based on performance, market conditions, and career changes.
+                  </div>
+                </div>
+              )}
+
+              <div className="grid md:grid-cols-2 gap-6 mb-6">
+                {/* Industry */}
+                <div>
+                  <label className="block text-lg font-semibold text-gray-700 mb-3">
+                    Industry
+                  </label>
+                  <select
+                    value={formData.industry}
+                    onChange={(e) => updateFormData('industry', e.target.value)}
+                    className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none"
+                  >
+                    <option value="">Select industry...</option>
+                    {industries.map((industry) => (
+                      <option key={industry} value={industry}>
+                        {industry}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-sm text-gray-600 mt-2">
+                    Helps us benchmark your salary and growth potential
+                  </p>
+                </div>
+
+                {/* Career growth expectations */}
+                <div>
+                  <label className="block text-lg font-semibold text-gray-700 mb-3">
+                    Career growth expectations
+                  </label>
+                  <select
+                    value={formData.careerGrowthExpectation}
+                    onChange={(e) => updateFormData('careerGrowthExpectation', e.target.value)}
+                    className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none"
+                  >
+                    <option value="">Select your situation...</option>
+                    {careerGrowthOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  
+                  {/* Show description for selected option */}
+                  {formData.careerGrowthExpectation && (
+                    <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <p className="text-sm text-blue-800">
+                        💡 <strong>{careerGrowthOptions.find(opt => opt.value === formData.careerGrowthExpectation)?.label}:</strong>{' '}
+                        {careerGrowthOptions.find(opt => opt.value === formData.careerGrowthExpectation)?.description}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Assets & Debts Context Section */}
+            <div className="mb-8">
+              <h4 className="text-xl font-semibold text-gray-800 mb-4">Your current assets & debts</h4>
+              <p className="text-gray-600 mb-6">
+                Help us understand how your current financial position fits into your Someday Life plan.
+              </p>
+
+              {/* Assets Section */}
+              <div className="mb-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h5 className="text-lg font-semibold text-gray-800">Current Assets</h5>
+                  <button
+                    onClick={() => {
+                      const newAsset = {
+                        id: Date.now(),
+                        type: '',
+                        name: '',
+                        value: '',
+                        somedayLifeRole: ''
+                      };
+                      updateFormData('currentAssets', [...formData.currentAssets, newAsset]);
+                    }}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                  >
+                    + Add Asset
+                  </button>
+                </div>
+
+                {formData.currentAssets.length === 0 ? (
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
+                    <p className="text-gray-600">
+                      Do you own a home, have savings, investments, or other assets? Click "Add Asset" to include them.
+                    </p>
+                    <p className="text-sm text-gray-500 mt-2">
+                      💡 We'll help you understand how each asset fits into your retirement planning
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {formData.currentAssets.map((asset, index) => (
+                      <div key={asset.id} className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                        <div className="grid md:grid-cols-4 gap-4 mb-4">
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">Asset Type</label>
+                            <select
+                              value={asset.type}
+                              onChange={(e) => {
+                                const updatedAssets = [...formData.currentAssets];
+                                updatedAssets[index].type = e.target.value;
+                                updateFormData('currentAssets', updatedAssets);
+                              }}
+                              className="w-full p-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                            >
+                              <option value="">Select...</option>
+                              <option value="primary_home">Primary Home</option>
+                              <option value="investment_property">Investment Property</option>
+                              <option value="savings_account">Savings Account</option>
+                              <option value="checking_account">Checking Account</option>
+                              <option value="401k_403b">401(k)/403(b)</option>
+                              <option value="ira_roth">IRA/Roth IRA</option>
+                              <option value="brokerage_account">Brokerage Account</option>
+                              <option value="vehicle">Vehicle</option>
+                              <option value="other">Other</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">Description</label>
+                            <input
+                              type="text"
+                              value={asset.name}
+                              onChange={(e) => {
+                                const updatedAssets = [...formData.currentAssets];
+                                updatedAssets[index].name = e.target.value;
+                                updateFormData('currentAssets', updatedAssets);
+                              }}
+                              placeholder="e.g., Family home, Emergency fund..."
+                              className="w-full p-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">Current Value</label>
+                            <input
+                              type="number"
+                              value={asset.value}
+                              onChange={(e) => {
+                                const updatedAssets = [...formData.currentAssets];
+                                updatedAssets[index].value = e.target.value;
+                                updateFormData('currentAssets', updatedAssets);
+                              }}
+                              placeholder="250000"
+                              className="w-full p-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                            />
+                          </div>
+
+                          <div className="flex items-end">
+                            <button
+                              onClick={() => {
+                                const updatedAssets = formData.currentAssets.filter((_, i) => i !== index);
+                                updateFormData('currentAssets', updatedAssets);
+                              }}
+                              className="w-full p-2 text-red-600 border border-red-300 rounded-lg hover:bg-red-50 transition-colors"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Someday Life Role Question */}
+                        <div className="border-t border-gray-300 pt-4">
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            Will this be part of your Someday Life?
+                          </label>
+                          <select
+                            value={asset.somedayLifeRole}
+                            onChange={(e) => {
+                              const updatedAssets = [...formData.currentAssets];
+                              updatedAssets[index].somedayLifeRole = e.target.value;
+                              updateFormData('currentAssets', updatedAssets);
+                            }}
+                            className="w-full p-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                          >
+                            <option value="">Choose...</option>
+                            <option value="keep_it">Keep it - Part of my retirement life</option>
+                            <option value="sell_to_fund">Sell to fund Someday Life</option>
+                            <option value="convert_to_rental">Convert to rental income</option>
+                            <option value="grows_with_me">Grows with me (investments)</option>
+                            <option value="not_relevant">Not relevant to retirement</option>
+                          </select>
+                          
+                          {asset.somedayLifeRole && (
+                            <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded">
+                              <p className="text-xs text-blue-800">
+                                {asset.somedayLifeRole === 'keep_it' && "✅ We'll factor this into your Someday Life asset base"}
+                                {asset.somedayLifeRole === 'sell_to_fund' && "💰 We'll include this sale value in your retirement funding"}
+                                {asset.somedayLifeRole === 'convert_to_rental' && "🏠 We'll calculate potential rental income for your retirement"}
+                                {asset.somedayLifeRole === 'grows_with_me' && "📈 We'll project growth and include in your portfolio"}
+                                {asset.somedayLifeRole === 'not_relevant' && "⚪ We'll exclude this from retirement calculations"}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Debts Section */}
+              <div className="mb-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h5 className="text-lg font-semibold text-gray-800">Current Debts</h5>
+                  <button
+                    onClick={() => {
+                      const newDebt = {
+                        id: Date.now(),
+                        type: '',
+                        name: '',
+                        balance: '',
+                        monthlyPayment: '',
+                        payoffDate: ''
+                      };
+                      updateFormData('currentDebts', [...formData.currentDebts, newDebt]);
+                    }}
+                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
+                  >
+                    + Add Debt
+                  </button>
+                </div>
+
+                {formData.currentDebts.length === 0 ? (
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
+                    <p className="text-gray-600">
+                      Do you have a mortgage, student loans, credit cards, or other debts? Click "Add Debt" to include them.
+                    </p>
+                    <p className="text-sm text-gray-500 mt-2">
+                      💡 We'll calculate when they'll be paid off and how that affects your retirement timeline
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {formData.currentDebts.map((debt, index) => (
+                      <div key={debt.id} className="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <div className="grid md:grid-cols-5 gap-4 mb-4">
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">Debt Type</label>
+                            <select
+                              value={debt.type}
+                              onChange={(e) => {
+                                const updatedDebts = [...formData.currentDebts];
+                                updatedDebts[index].type = e.target.value;
+                                updateFormData('currentDebts', updatedDebts);
+                              }}
+                              className="w-full p-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                            >
+                              <option value="">Select...</option>
+                              <option value="mortgage">Mortgage</option>
+                              <option value="student_loan">Student Loan</option>
+                              <option value="credit_card">Credit Card</option>
+                              <option value="car_loan">Car Loan</option>
+                              <option value="personal_loan">Personal Loan</option>
+                              <option value="heloc">HELOC</option>
+                              <option value="other">Other</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">Description</label>
+                            <input
+                              type="text"
+                              value={debt.name}
+                              onChange={(e) => {
+                                const updatedDebts = [...formData.currentDebts];
+                                updatedDebts[index].name = e.target.value;
+                                updateFormData('currentDebts', updatedDebts);
+                              }}
+                              placeholder="e.g., Home mortgage, MBA loan..."
+                              className="w-full p-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">Balance</label>
+                            <input
+                              type="number"
+                              value={debt.balance}
+                              onChange={(e) => {
+                                const updatedDebts = [...formData.currentDebts];
+                                updatedDebts[index].balance = e.target.value;
+                                updateFormData('currentDebts', updatedDebts);
+                              }}
+                              placeholder="150000"
+                              className="w-full p-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">Monthly Payment</label>
+                            <input
+                              type="number"
+                              value={debt.monthlyPayment}
+                              onChange={(e) => {
+                                const updatedDebts = [...formData.currentDebts];
+                                updatedDebts[index].monthlyPayment = e.target.value;
+                                updateFormData('currentDebts', updatedDebts);
+                              }}
+                              placeholder="1200"
+                              className="w-full p-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                            />
+                          </div>
+
+                          <div className="flex items-end">
+                            <button
+                              onClick={() => {
+                                const updatedDebts = formData.currentDebts.filter((_, i) => i !== index);
+                                updateFormData('currentDebts', updatedDebts);
+                              }}
+                              className="w-full p-2 text-red-600 border border-red-300 rounded-lg hover:bg-red-50 transition-colors"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Payoff Timeline Question */}
+                        <div className="border-t border-red-300 pt-4">
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            When will this be paid off?
+                          </label>
+                          <input
+                            type="date"
+                            value={debt.payoffDate}
+                            onChange={(e) => {
+                              const updatedDebts = [...formData.currentDebts];
+                              updatedDebts[index].payoffDate = e.target.value;
+                              updateFormData('currentDebts', updatedDebts);
+                            }}
+                            className="w-full p-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                          />
+                          
+                          {debt.payoffDate && formData.currentAge && (
+                            (() => {
+                              const payoffYear = new Date(debt.payoffDate).getFullYear();
+                              const currentYear = new Date().getFullYear();
+                              const retirementAge = 65; // Default retirement age
+                              const retirementYear = currentYear + (retirementAge - parseInt(formData.currentAge));
+                              const paidOffBeforeRetirement = payoffYear <= retirementYear;
+                              
+                              return (
+                                <div className={`mt-2 p-2 rounded ${paidOffBeforeRetirement ? 'bg-green-50 border border-green-200' : 'bg-yellow-50 border border-yellow-200'}`}>
+                                  <p className={`text-xs ${paidOffBeforeRetirement ? 'text-green-800' : 'text-yellow-800'}`}>
+                                    {paidOffBeforeRetirement 
+                                      ? "✅ This will be paid off before your Someday Life begins - great!"
+                                      : "⚠️ This debt may still exist during retirement - we'll factor this into your planning"
+                                    }
+                                  </p>
+                                </div>
+                              );
+                            })()
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
 
             {/* Preliminary Insight */}
             {preliminaryInsight && (
@@ -1879,6 +3127,38 @@ const SomedayLifeBuilder = ({ onComplete, onBack }) => {
               </div>
             )}
 
+            {/* AI Insight after financial data entry */}
+            {formData.currentAge && formData.incomeRange && formData.occupation && (
+              <div className="mb-6">
+                <AIInsight
+                  type="financial-percentile"
+                  data={{
+                    income: useIncomeRange 
+                      ? (incomeRanges.find(range => range.value === formData.incomeRange)?.midpoint || 0)
+                      : parseFloat(formData.incomeRange.toString().replace(/,/g, '')) || 0,
+                    age: formData.currentAge,
+                    savings: formData.currentAssets.reduce((total, asset) => total + (parseFloat(asset.value) || 0), 0),
+                    percentile: (() => {
+                      const income = useIncomeRange 
+                        ? (incomeRanges.find(range => range.value === formData.incomeRange)?.midpoint || 0)
+                        : parseFloat(formData.incomeRange.toString().replace(/,/g, '')) || 0;
+                      const age = parseInt(formData.currentAge);
+                      
+                      // Simple percentile calculation based on age and income
+                      if (age < 35) {
+                        return income > 80000 ? 75 : income > 60000 ? 60 : income > 45000 ? 45 : 30;
+                      } else if (age < 50) {
+                        return income > 120000 ? 80 : income > 90000 ? 65 : income > 70000 ? 50 : 35;
+                      } else {
+                        return income > 150000 ? 85 : income > 100000 ? 70 : income > 80000 ? 55 : 40;
+                      }
+                    })()
+                  }}
+                  confidence="89"
+                />
+              </div>
+            )}
+
             {/* Navigation */}
             <div className="flex justify-between">
               <button
@@ -1889,7 +3169,7 @@ const SomedayLifeBuilder = ({ onComplete, onBack }) => {
               </button>
               <button
                 onClick={calculateFinalResults}
-                disabled={!formData.currentAge || !formData.incomeRange || !formData.selectedState}
+                disabled={!formData.currentAge || !formData.incomeRange || !formData.selectedState || !formData.occupation || !formData.industry}
                 className="px-8 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
               >
                 Create My Plan

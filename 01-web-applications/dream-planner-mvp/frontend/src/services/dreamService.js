@@ -2,15 +2,25 @@
  * Centralized Dream Management Service
  * Provides standardized methods for dream CRUD operations
  * All components should use these methods instead of directly accessing localStorage
+ * 
+ * Goal Types:
+ * - 'someday_life': Major life change goals with property cost and annual expenses
+ * - 'milestone': Single purchase or achievement goals
+ * - 'investment': Financial investment or savings goals
  */
+
+// Migration flag to ensure migration runs only once
+const MIGRATION_KEY = 'dreams_migration_v1_completed'
 
 export const DreamService = {
   /**
-   * Get all dreams from localStorage
+   * Get all dreams from localStorage (with migration)
    * @returns {Array} Array of dream objects
    */
   getAllDreams: () => {
     try {
+      // Run migration if not completed
+      DreamService.runMigrationIfNeeded()
       return JSON.parse(localStorage.getItem('dreams') || '[]')
     } catch (error) {
       console.error('Error parsing dreams from localStorage:', error)
@@ -26,14 +36,26 @@ export const DreamService = {
   saveDream: (dream) => {
     try {
       const dreams = DreamService.getAllDreams()
+      
+      // Validate Someday Life constraint
+      if (dream.type === 'someday_life') {
+        const existingSomedayLife = dreams.find(d => d.type === 'someday_life')
+        if (existingSomedayLife) {
+          throw new Error('SOMEDAY_LIFE_EXISTS')
+        }
+      }
+      
+      // Ensure unique ID
       const newDream = {
         ...dream,
-        id: Date.now(),
+        id: dream.id || DreamService.generateUniqueId(),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         status: 'active',
-        progress: 0
+        progress: 0,
+        type: dream.type || DreamService.inferDreamType(dream)
       }
+      
       dreams.push(newDream)
       localStorage.setItem('dreams', JSON.stringify(dreams))
       return dreams
@@ -122,11 +144,292 @@ export const DreamService = {
   clearAllDreams: () => {
     try {
       localStorage.removeItem('dreams')
+      localStorage.removeItem(MIGRATION_KEY)
       return []
     } catch (error) {
       console.error('Error clearing dreams:', error)
       throw error
     }
+  },
+
+  /**
+   * Generate a unique ID for dreams
+   * @returns {string} Unique identifier
+   */
+  generateUniqueId: () => {
+    return `dream_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  },
+
+  /**
+   * Infer dream type from dream properties
+   * @param {Object} dream - Dream object
+   * @returns {string} Dream type
+   */
+  inferDreamType: (dream) => {
+    // Check for Someday Life indicators
+    if (dream.title && dream.title.toLowerCase().includes('someday life')) {
+      return 'someday_life'
+    }
+    if (dream.property_cost || dream.annual_expenses || dream.living_expenses_per_year) {
+      return 'someday_life'
+    }
+    if (dream.title && (dream.title.toLowerCase().includes('retirement') || dream.title.toLowerCase().includes('financial independence'))) {
+      return 'someday_life'
+    }
+    
+    // Check for investment indicators
+    if (dream.category === 'investment' || dream.title?.toLowerCase().includes('investment')) {
+      return 'investment'
+    }
+    
+    // Default to milestone for single purchase goals
+    return 'milestone'
+  },
+
+  /**
+   * Get dreams by type
+   * @param {string} type - Dream type to filter by
+   * @returns {Array} Array of dreams of specified type
+   */
+  getDreamsByType: (type) => {
+    try {
+      const dreams = DreamService.getAllDreams()
+      return dreams.filter(dream => dream.type === type)
+    } catch (error) {
+      console.error('Error getting dreams by type:', error)
+      return []
+    }
+  },
+
+  /**
+   * Get the current Someday Life goal (should only be one)
+   * @returns {Object|null} Someday Life goal or null
+   */
+  getSomedayLifeGoal: () => {
+    try {
+      const somedayLifeGoals = DreamService.getDreamsByType('someday_life')
+      // Return the most recent if multiple exist (shouldn't happen after migration)
+      return somedayLifeGoals.length > 0 ? somedayLifeGoals[somedayLifeGoals.length - 1] : null
+    } catch (error) {
+      console.error('Error getting Someday Life goal:', error)
+      return null
+    }
+  },
+
+  /**
+   * Replace existing Someday Life goal
+   * @param {Object} newSomedayLife - New Someday Life goal
+   * @returns {Array} Updated dreams array
+   */
+  replaceSomedayLifeGoal: (newSomedayLife) => {
+    try {
+      let dreams = DreamService.getAllDreams()
+      // Remove existing Someday Life goals
+      dreams = dreams.filter(dream => dream.type !== 'someday_life')
+      
+      // Add the new one
+      const newDream = {
+        ...newSomedayLife,
+        id: newSomedayLife.id || DreamService.generateUniqueId(),
+        type: 'someday_life',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        status: 'active',
+        progress: 0
+      }
+      
+      dreams.push(newDream)
+      localStorage.setItem('dreams', JSON.stringify(dreams))
+      return dreams
+    } catch (error) {
+      console.error('Error replacing Someday Life goal:', error)
+      throw error
+    }
+  },
+
+  /**
+   * Check if user wants to replace existing Someday Life goal
+   * @param {Object} newSomedayLife - New Someday Life goal
+   * @returns {Promise<boolean>} User's choice
+   */
+  confirmSomedayLifeReplacement: async (newSomedayLife) => {
+    const existing = DreamService.getSomedayLifeGoal()
+    if (!existing) return true
+    
+    return new Promise((resolve) => {
+      const message = `You already have a Someday Life goal: "${existing.title}"\n\nWould you like to replace it with: "${newSomedayLife.title}"?`
+      const replace = confirm(message)
+      resolve(replace)
+    })
+  },
+
+  /**
+   * Run migration to categorize existing dreams (runs once)
+   */
+  runMigrationIfNeeded: () => {
+    try {
+      // Check if migration already completed
+      if (localStorage.getItem(MIGRATION_KEY)) {
+        return
+      }
+      
+      console.log('🔄 Running dreams migration to categorize goal types...')
+      
+      let dreams = JSON.parse(localStorage.getItem('dreams') || '[]')
+      let migrationChanges = 0
+      let duplicatesRemoved = 0
+      
+      // Check for legacy SomedayLifeBuilder data
+      const legacySomedayDream = localStorage.getItem('somedayDream')
+      if (legacySomedayDream) {
+        try {
+          const somedayData = JSON.parse(legacySomedayDream)
+          const legacyGoal = {
+            id: DreamService.generateUniqueId(),
+            title: somedayData.title || 'Someday Life - Financial Independence',
+            description: somedayData.description || '',
+            type: 'someday_life',
+            target_amount: somedayData.requiredNetWorth || somedayData.estimatedCost || 0,
+            property_cost: somedayData.estimatedCost || 0,
+            annual_expenses: somedayData.totalAnnualCost || 0,
+            target_date: new Date(new Date().getFullYear() + (somedayData.timeline || 25), 11, 31).toISOString(),
+            category: 'freedom',
+            location: somedayData.location || '',
+            housing_type: somedayData.housingType || '',
+            required_portfolio: somedayData.requiredPortfolio || 0,
+            target_age: somedayData.targetAge || 65,
+            current_age: somedayData.currentAge || 30,
+            is_lifestyle_transformation: true,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            status: 'active',
+            progress: 0
+          }
+          
+          // Check if we already have this goal
+          const alreadyExists = dreams.find(d => 
+            d.title?.includes('Someday Life') || 
+            d.title?.includes('Financial Independence') ||
+            d.type === 'someday_life'
+          )
+          
+          if (!alreadyExists) {
+            dreams.push(legacyGoal)
+            migrationChanges++
+            console.log('📦 Migrated legacy Someday Life goal from somedayDream')
+          }
+        } catch (error) {
+          console.error('Error migrating legacy Someday Life data:', error)
+        }
+      }
+      
+      // Clean up test data and duplicates first
+      const originalCount = dreams.length
+      dreams = DreamService.cleanupTestData(dreams)
+      dreams = DreamService.removeDuplicates(dreams)
+      duplicatesRemoved = originalCount - dreams.length
+      
+      // Categorize dreams and ensure unique IDs
+      dreams = dreams.map(dream => {
+        const updates = {}
+        
+        // Ensure unique ID
+        if (!dream.id || typeof dream.id !== 'string' || !dream.id.startsWith('dream_')) {
+          updates.id = DreamService.generateUniqueId()
+        }
+        
+        // Add type if missing
+        if (!dream.type) {
+          updates.type = DreamService.inferDreamType(dream)
+          migrationChanges++
+        }
+        
+        // Add timestamps if missing
+        if (!dream.createdAt) {
+          updates.createdAt = new Date().toISOString()
+        }
+        if (!dream.updatedAt) {
+          updates.updatedAt = new Date().toISOString()
+        }
+        
+        return Object.keys(updates).length > 0 ? { ...dream, ...updates } : dream
+      })
+      
+      // Handle multiple Someday Life goals
+      const somedayLifeGoals = dreams.filter(dream => dream.type === 'someday_life')
+      if (somedayLifeGoals.length > 1) {
+        console.log(`⚠️ Found ${somedayLifeGoals.length} Someday Life goals, keeping the most recent`)
+        // Keep only the most recent Someday Life goal
+        const mostRecent = somedayLifeGoals.reduce((latest, current) => 
+          new Date(current.createdAt || current.updatedAt || 0) > new Date(latest.createdAt || latest.updatedAt || 0) 
+            ? current : latest
+        )
+        
+        // Remove other Someday Life goals
+        dreams = dreams.filter(dream => 
+          dream.type !== 'someday_life' || dream.id === mostRecent.id
+        )
+      }
+      
+      // Save migrated dreams
+      localStorage.setItem('dreams', JSON.stringify(dreams))
+      localStorage.setItem(MIGRATION_KEY, 'true')
+      
+      console.log(`✅ Migration completed:`, {
+        totalDreams: dreams.length,
+        categorized: migrationChanges,
+        duplicatesRemoved,
+        somedayLifeGoals: dreams.filter(d => d.type === 'someday_life').length,
+        milestones: dreams.filter(d => d.type === 'milestone').length,
+        investments: dreams.filter(d => d.type === 'investment').length
+      })
+      
+    } catch (error) {
+      console.error('Error during migration:', error)
+    }
+  },
+
+  /**
+   * Clean up test data and problematic entries
+   * @param {Array} dreams - Array of dreams
+   * @returns {Array} Cleaned dreams array
+   */
+  cleanupTestData: (dreams) => {
+    const testPatterns = [
+      /french.?chateau/i,
+      /test.?data/i,
+      /sample.?dream/i,
+      /demo.?goal/i
+    ]
+    
+    return dreams.filter(dream => {
+      const titleMatch = testPatterns.some(pattern => pattern.test(dream.title || ''))
+      const descMatch = testPatterns.some(pattern => pattern.test(dream.description || ''))
+      
+      if (titleMatch || descMatch) {
+        console.log('🗑️ Removing test data:', dream.title)
+        return false
+      }
+      return true
+    })
+  },
+
+  /**
+   * Remove duplicate dreams based on title and target amount
+   * @param {Array} dreams - Array of dreams
+   * @returns {Array} Deduplicated dreams array
+   */
+  removeDuplicates: (dreams) => {
+    const seen = new Set()
+    return dreams.filter(dream => {
+      const key = `${dream.title?.toLowerCase()}_${dream.target_amount}`
+      if (seen.has(key)) {
+        console.log('🗑️ Removing duplicate:', dream.title)
+        return false
+      }
+      seen.add(key)
+      return true
+    })
   }
 }
 

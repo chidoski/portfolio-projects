@@ -4,43 +4,71 @@ import { Sparkles, Plus, Target, Calendar, DollarSign, TrendingUp, Calculator, Z
 import ProgressBar from '../components/ProgressBar'
 import SomedayLifeHero from '../components/SomedayLifeHero'
 import LifeMilestonesTimeline from '../components/LifeMilestonesTimeline'
-import LifeJourneyTimeline from '../components/LifeJourneyTimeline'
+import JourneyPathVisualization from '../components/JourneyPathVisualization'
+import GrowthPotentialDashboard from '../components/GrowthPotentialDashboard'
+import OptimizationDashboard from '../components/OptimizationDashboard'
+import RetirementReadinessDashboard from '../components/RetirementReadinessDashboard'
+import TodaysImpactWidget from '../components/TodaysImpactWidget'
 import { DreamService } from '../services/dreamService'
+import { getTextVariants } from '../utils/psychProfileUtils'
+import { getDashboardContent } from '../utils/adaptiveContent'
+import { calculateTimeHorizon, getTimeHorizonContent, getDashboardLayout } from '../utils/timeHorizonUtils'
+import AIInsight from '../components/AIInsight'
 
 /**
  * Dashboard Component
  * Main dashboard for managing and viewing all user dreams
+ * Adapts layout and content based on user's time horizon to retirement
  */
-const Dashboard = ({ onAddDream, highlightedDreamId, onNavigateToZeroBasedPlanner, onNavigateToIncomeAccelerator }) => {
+const Dashboard = ({ onAddDream, highlightedDreamId, onNavigateToZeroBasedPlanner, onNavigateToIncomeAccelerator, onNavigateToSomedayLifeBuilder }) => {
   const [dreams, setDreams] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedDream, setSelectedDream] = useState(null)
+  
+  // User profile data - with ability to test different scenarios
+  const [userProfile, setUserProfile] = useState({
+    currentAge: 28, // This would be dynamic in real app
+    retirementAge: 65,
+    somedayLifeAge: 52
+  })
+  
+  // Test scenarios for demonstration
+  const testScenarios = {
+    young: { currentAge: 25, retirementAge: 65, somedayLifeAge: 45, label: 'Young Professional (25)' },
+    middle: { currentAge: 45, retirementAge: 65, somedayLifeAge: 55, label: 'Mid-Career (45)' },
+    near: { currentAge: 58, retirementAge: 65, somedayLifeAge: 62, label: 'Near Retirement (58)' }
+  }
+  
+  // Calculate time horizon and get adaptive content
+  const timeHorizon = calculateTimeHorizon(userProfile.currentAge, userProfile.retirementAge)
+  const timeHorizonContent = getTimeHorizonContent(timeHorizon.horizonType, timeHorizon.yearsUntilRetirement)
+  const dashboardLayout = getDashboardLayout(timeHorizon.horizonType)
 
   // Load dreams on component mount
   useEffect(() => {
     const loadUserDreams = () => {
       try {
-        // Debug console logging for localStorage investigation
-        console.log('All localStorage keys:', Object.keys(localStorage))
-        console.log('Dreams in storage:', localStorage.getItem('dreams'))
-        console.log('Current dream:', localStorage.getItem('currentDream'))
-        console.log('Dream list:', localStorage.getItem('dreamsList'))
+        // Get all dreams and separate by type
+        const allDreams = DreamService.getAllDreams()
+        const somedayLifeGoal = DreamService.getSomedayLifeGoal()
+        const milestoneGoals = DreamService.getDreamsByType('milestone')
+        const investmentGoals = DreamService.getDreamsByType('investment')
         
-        const savedDreams = DreamService.getAllDreams()
-        const uniqueDreams = DreamService.getUniqueDreams()
+        console.log('Dreams loaded by type:', {
+          somedayLife: somedayLifeGoal ? 1 : 0,
+          milestones: milestoneGoals.length,
+          investments: investmentGoals.length,
+          total: allDreams.length
+        })
         
-        // Log deduplication results for debugging
-        if (savedDreams.length !== uniqueDreams.length) {
-          console.log(`Removed ${savedDreams.length - uniqueDreams.length} duplicate dreams`)
-          console.log('Original dreams count:', savedDreams.length)
-          console.log('Unique dreams count:', uniqueDreams.length)
-        }
-        
-        setDreams(uniqueDreams)
+        // For now, we'll use milestones and investments in the main dreams display
+        // The Someday Life goal will be handled separately
+        const displayDreams = [...milestoneGoals, ...investmentGoals]
+        setDreams(displayDreams)
         
         // If there's a highlighted dream ID, find and select it
         if (highlightedDreamId) {
-          const highlightedDream = uniqueDreams.find(dream => dream.id === highlightedDreamId)
+          const highlightedDream = allDreams.find(dream => dream.id === highlightedDreamId)
           if (highlightedDream) {
             setSelectedDream(highlightedDream)
           }
@@ -125,14 +153,33 @@ const Dashboard = ({ onAddDream, highlightedDreamId, onNavigateToZeroBasedPlanne
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
+        {/* Adaptive Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Your Dreams Dashboard</h1>
-              <p className="text-gray-600">Track your progress and stay motivated on your journey</p>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">{timeHorizonContent.dashboardTitle}</h1>
+              <p className="text-gray-600">{timeHorizonContent.focusMessage}</p>
+              <div className="mt-2 flex items-center space-x-4 text-sm">
+                <span className={`px-3 py-1 rounded-full text-${timeHorizonContent.emphasisColor}-700 bg-${timeHorizonContent.emphasisColor}-100 font-medium`}>
+                  {timeHorizon.phase}
+                </span>
+                <span className="text-gray-500">
+                  {timeHorizon.yearsUntilRetirement} years to retirement
+                </span>
+              </div>
             </div>
             <div className="flex items-center space-x-3">
+              {/* Test Scenario Selector */}
+              <select 
+                value={Object.keys(testScenarios).find(key => testScenarios[key].currentAge === userProfile.currentAge) || 'young'}
+                onChange={(e) => setUserProfile(testScenarios[e.target.value])}
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {Object.entries(testScenarios).map(([key, scenario]) => (
+                  <option key={key} value={key}>{scenario.label}</option>
+                ))}
+              </select>
+              
               <button
                 onClick={onNavigateToZeroBasedPlanner}
                 className="btn-secondary flex items-center px-4 py-2"
@@ -145,7 +192,7 @@ const Dashboard = ({ onAddDream, highlightedDreamId, onNavigateToZeroBasedPlanne
                 className="btn-primary flex items-center px-6 py-3"
               >
                 <Plus className="w-5 h-5 mr-2" />
-                Add New Dream
+{getDashboardContent('addButton', 'Add New Dream')}
               </button>
             </div>
           </div>
@@ -157,46 +204,129 @@ const Dashboard = ({ onAddDream, highlightedDreamId, onNavigateToZeroBasedPlanne
             <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-4 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-6">
               <Sparkles className="w-8 h-8 text-white" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Start Your Dream Journey</h2>
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">{getDashboardContent('emptyStateTitle', 'Start Your Dream Journey')}</h2>
             <p className="text-gray-600 mb-8 max-w-md mx-auto">
-              Create your first dream and discover how small daily actions can turn into life-changing achievements.
+              {getDashboardContent('emptyStateMessage', 'Create your first dream and discover how small daily actions can turn into life-changing achievements.')}
             </p>
             <button
               onClick={onAddDream}
               className="btn-primary px-8 py-3 text-lg"
             >
-              Create Your First Dream
+              {getDashboardContent('addButton', 'Create Your First Dream')}
             </button>
           </div>
         ) : (
           <>
-            {/* Your Someday Life Hero Section */}
+            {/* Someday Life Goal Section - Only show if one exists */}
+            {(() => {
+              const somedayLifeGoal = DreamService.getSomedayLifeGoal()
+              return somedayLifeGoal ? (
+                <div className="mb-12">
+                  <div className={`bg-gradient-to-br from-${timeHorizonContent.emphasisColor}-50 via-blue-50 to-yellow-50 rounded-3xl p-6 shadow-lg border border-${timeHorizonContent.emphasisColor}-100`}>
+                    <div className="text-center mb-6">
+                      <h2 className="text-2xl font-bold text-gray-900 mb-2">{somedayLifeGoal.title}</h2>
+                      <p className="text-lg text-gray-700 max-w-3xl mx-auto">{timeHorizonContent.heroSubtitle}</p>
+                    </div>
+                    <SomedayLifeHero 
+                      userAge={userProfile.currentAge}
+                      targetAge={userProfile.somedayLifeAge}
+                      propertyTarget={somedayLifeGoal.property_cost || somedayLifeGoal.target_amount || 450000}
+                      livingExpensesPerYear={somedayLifeGoal.annual_expenses || somedayLifeGoal.living_expenses_per_year || 40000}
+                      yearsOfExpenses={25}
+                      currentPropertySaved={somedayLifeGoal.currentAmount || 45000}
+                      currentExpensesSaved={120000}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="mb-12">
+                  <div className="bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 rounded-3xl p-8 shadow-lg border border-blue-100 text-center">
+                    <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-4 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-6">
+                      <Sparkles className="w-8 h-8 text-white" />
+                    </div>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-4">Ready to Define Your Someday Life?</h2>
+                    <p className="text-lg text-gray-600 mb-6 max-w-2xl mx-auto">
+                      Your Someday Life is your ultimate vision of financial freedom. It's more than retirement - it's the lifestyle you want to live when money is no longer a constraint.
+                    </p>
+                    <button 
+                      onClick={() => onNavigateToSomedayLifeBuilder && onNavigateToSomedayLifeBuilder()}
+                      className="btn-primary px-8 py-3 text-lg"
+                    >
+                      <Plus className="w-5 h-5 mr-2" />
+                      Create Your Someday Life Goal
+                    </button>
+                  </div>
+                </div>
+              )
+            })()}
+
+            {/* Time Horizon Specific Dashboard */}
             <div className="mb-12">
-              <SomedayLifeHero 
-                userAge={28}
-                targetAge={52}
-                propertyTarget={450000}
-                livingExpensesPerYear={40000}
-                yearsOfExpenses={25}
-                currentPropertySaved={45000}
-                currentExpensesSaved={120000}
-              />
+              {timeHorizon.horizonType === 'growth' && (
+                <GrowthPotentialDashboard 
+                  currentAge={userProfile.currentAge}
+                  retirementAge={userProfile.retirementAge}
+                  monthlyContribution={500} // This would come from user profile
+                  currentSavings={5000} // This would come from user profile
+                  dreams={dreams}
+                />
+              )}
+              
+              {timeHorizon.horizonType === 'optimization' && (
+                <OptimizationDashboard 
+                  currentAge={userProfile.currentAge}
+                  retirementAge={userProfile.retirementAge}
+                  currentSavings={250000} // This would come from user profile
+                  monthlyContribution={1500} // This would come from user profile
+                  desiredRetirementIncome={100000} // This would come from user profile
+                  dreams={dreams}
+                />
+              )}
+              
+              {timeHorizon.horizonType === 'validation' && (
+                <RetirementReadinessDashboard 
+                  currentAge={userProfile.currentAge}
+                  retirementAge={userProfile.retirementAge}
+                  currentSavings={500000} // This would come from user profile
+                  monthlyContribution={2000} // This would come from user profile
+                  desiredRetirementIncome={80000} // This would come from user profile
+                  dreams={dreams}
+                />
+              )}
             </div>
 
-            {/* Life Milestones Along the Way */}
-            <div className="mb-12">
-              <LifeMilestonesTimeline 
-                dreams={dreams}
-                somedayLifeAge={52}
-              />
-            </div>
+            {/* Today's Impact Widget - Only for growth phase */}
+            {timeHorizon.horizonType === 'growth' && (
+              <div className="mb-12">
+                <TodaysImpactWidget 
+                  dailySavings={47}
+                  dreams={dreams}
+                  somedayLifeTarget={1450000}
+                  foundationTarget={100000}
+                  currentSomedayLifeSaved={165000}
+                  currentFoundationSaved={35000}
+                />
+              </div>
+            )}
 
-            {/* Complete Life Journey Timeline */}
+            {/* Life Milestones Along the Way - For optimization and validation phases */}
+            {(timeHorizon.horizonType === 'optimization' || timeHorizon.horizonType === 'validation') && (
+              <div className="mb-12">
+                <LifeMilestonesTimeline 
+                  dreams={dreams}
+                  somedayLifeAge={userProfile.somedayLifeAge}
+                />
+              </div>
+            )}
+
+            {/* Adaptive Journey Path Visualization */}
             <div className="mb-12">
-              <LifeJourneyTimeline 
+              <JourneyPathVisualization 
                 dreams={dreams}
-                userAge={28}
-                somedayLifeAge={52}
+                userAge={userProfile.currentAge}
+                retirementAge={userProfile.retirementAge}
+                somedayLifeAge={userProfile.somedayLifeAge}
+                timeHorizonType={timeHorizon.horizonType}
               />
             </div>
 

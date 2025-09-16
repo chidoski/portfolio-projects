@@ -648,6 +648,20 @@ export class NorthStarDream {
     travelBudget = 0,
     hobbiesBudget = 0,
     
+    // Detailed annual spending breakdown (new structure)
+    annualSpending = {
+      basicLiving: 0,      // Core living expenses (housing, utilities, groceries, insurance)
+      hobbiesInterests: 0, // Recreation, entertainment, personal interests
+      travelExperiences: 0, // Travel, dining out, special experiences
+      healthWellness: 0,   // Healthcare, fitness, wellness activities
+      familyGiving: 0,     // Family support, charitable giving, gifts
+      emergencyBuffer: 0   // Unexpected expenses, inflation protection
+    },
+    totalAnnualCost = 0,      // Total of all annual spending categories
+    requiredPortfolio = 0,    // Portfolio needed for 4% rule (25x annual spending)
+    estimatedCost = 0,        // Property cost (separate from ongoing expenses)
+    isLifestyleTransformation = false, // Flag to distinguish from other dreams/goals
+    
     // Property goals
     primaryResidence = {
       targetValue: 0,
@@ -697,6 +711,11 @@ export class NorthStarDream {
     this.healthcareCosts = healthcareCosts;
     this.travelBudget = travelBudget;
     this.hobbiesBudget = hobbiesBudget;
+    this.annualSpending = annualSpending;
+    this.totalAnnualCost = totalAnnualCost;
+    this.requiredPortfolio = requiredPortfolio;
+    this.estimatedCost = estimatedCost;
+    this.isLifestyleTransformation = isLifestyleTransformation;
     this.primaryResidence = primaryResidence;
     this.investmentStrategy = investmentStrategy;
     this.milestones = milestones;
