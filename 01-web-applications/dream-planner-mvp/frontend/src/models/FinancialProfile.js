@@ -4,6 +4,9 @@
  * Includes interfaces for user profile, obligations, expenses, assets, and dreams
  */
 
+// Global counter for debugging infinite loops
+let calculationCount = 0;
+
 /**
  * User Profile Interface
  * Basic demographic and personal information
@@ -201,6 +204,20 @@ export class Debt {
   }
 
   calculateRemainingMonths() {
+    // Debug infinite loop detection
+    calculationCount++;
+    if (calculationCount > 100) {
+      console.error('Infinite loop detected in calculateRemainingMonths! Calculation count:', calculationCount);
+      console.error('Debt details:', {
+        name: this.name,
+        balance: this.currentBalance,
+        payment: this.monthlyPayment,
+        rate: this.interestRate
+      });
+      calculationCount = 0; // Reset counter
+      return 999; // Return high number to indicate problem
+    }
+    
     if (this.monthlyPayment <= 0 || this.currentBalance <= 0) return 0;
     
     const monthlyInterestRate = this.interestRate / 100 / 12;
@@ -234,6 +251,9 @@ export class Debt {
       console.log(`- Ratio: ${ratio.toFixed(6)}`);
       console.log(`- Calculated months: ${months.toFixed(2)}`);
     }
+    
+    // Reset counter on successful calculation
+    calculationCount = 0;
     
     return Math.ceil(months);
   }
@@ -308,93 +328,160 @@ export class Debt {
  * Regular monthly expenses that don't change much
  */
 export class FixedExpenses {
-  constructor({
-    housing = {
-      rent: 0,
-      mortgage: 0,
-      propertyTax: 0,
-      homeInsurance: 0,
-      hoaFees: 0,
-      utilities: {
-        electricity: 0,
-        gas: 0,
-        water: 0,
-        internet: 0,
-        cable: 0,
-        phone: 0,
-        trash: 0
+  constructor(data) {
+    // Define complete defaults first - this ensures all properties exist
+    const defaults = {
+      housing: {
+        rent: 0,
+        mortgage: 0,
+        propertyTax: 0,
+        homeInsurance: 0,
+        hoaFees: 0,
+        utilities: {
+          electricity: 0,
+          gas: 0,
+          water: 0,
+          internet: 0,
+          cable: 0,
+          phone: 0,
+          trash: 0
+        },
+        maintenance: 0,
+        total: 0
       },
-      maintenance: 0,
-      total: 0
-    },
-    insurance = {
-      health: 0,
-      dental: 0,
-      vision: 0,
-      life: 0,
-      disability: 0,
-      auto: 0,
-      renters: 0,
-      umbrella: 0,
-      total: 0
-    },
-    transportation = {
-      carPayment: 0,
-      gasoline: 0,
-      maintenance: 0,
-      registration: 0,
-      parking: 0,
-      publicTransit: 0,
-      rideshare: 0,
-      total: 0
-    },
-    subscriptions = {
-      streaming: 0,
-      music: 0,
-      software: 0,
-      gym: 0,
-      magazines: 0,
-      other: 0,
-      total: 0
-    },
-    childcare = {
-      daycare: 0,
-      babysitting: 0,
-      afterSchool: 0,
-      activities: 0,
-      total: 0
-    },
-    other = {
-      alimony: 0,
-      childSupport: 0,
-      elderCare: 0,
-      petCare: 0,
-      total: 0
-    },
-    totalFixedExpenses = 0,
-    lastUpdated = new Date().toISOString()
-  } = {}) {
-    this.housing = housing;
-    this.insurance = insurance;
-    this.transportation = transportation;
-    this.subscriptions = subscriptions;
-    this.childcare = childcare;
-    this.other = other;
-    this.totalFixedExpenses = totalFixedExpenses || this.calculateTotalExpenses();
-    this.lastUpdated = lastUpdated;
+      insurance: {
+        health: 0,
+        dental: 0,
+        vision: 0,
+        life: 0,
+        disability: 0,
+        auto: 0,
+        renters: 0,
+        umbrella: 0,
+        total: 0
+      },
+      transportation: {
+        carPayment: 0,
+        gasoline: 0,
+        maintenance: 0,
+        registration: 0,
+        parking: 0,
+        publicTransit: 0,
+        rideshare: 0,
+        total: 0
+      },
+      subscriptions: {
+        streaming: 0,
+        music: 0,
+        software: 0,
+        gym: 0,
+        magazines: 0,
+        other: 0,
+        total: 0
+      },
+      childcare: {
+        daycare: 0,
+        babysitting: 0,
+        afterSchool: 0,
+        activities: 0,
+        total: 0
+      },
+      other: {
+        alimony: 0,
+        childSupport: 0,
+        elderCare: 0,
+        petCare: 0,
+        total: 0
+      },
+      totalFixedExpenses: 0,
+      lastUpdated: new Date().toISOString()
+    };
+
+    // Handle special case where data might be flat numbers (from SomedayLifeBuilder)
+    let normalizedData = {};
+    if (data && typeof data === 'object') {
+      // Handle flat structure like {housing: 1250, transportation: 500}
+      if (typeof data.housing === 'number') {
+        normalizedData.housing = { ...defaults.housing, rent: data.housing, total: data.housing };
+      }
+      if (typeof data.transportation === 'number') {
+        normalizedData.transportation = { ...defaults.transportation, carPayment: data.transportation, total: data.transportation };
+      }
+      if (typeof data.insurance === 'number') {
+        normalizedData.insurance = { ...defaults.insurance, health: data.insurance, total: data.insurance };
+      }
+      if (typeof data.food === 'number') {
+        // Map food to other category for compatibility
+        normalizedData.other = { ...defaults.other, total: data.food };
+      }
+      if (typeof data.utilities === 'number') {
+        // Map utilities to housing.utilities for compatibility
+        normalizedData.housing = { 
+          ...defaults.housing, 
+          utilities: { ...defaults.housing.utilities, electricity: data.utilities },
+          total: (normalizedData.housing?.total || 0) + data.utilities
+        };
+      }
+      
+      // Merge any other object properties
+      Object.keys(data).forEach(key => {
+        if (typeof data[key] === 'object' && data[key] !== null) {
+          normalizedData[key] = data[key];
+        }
+      });
+    }
+
+    // Safely merge defaults with normalized data
+    const expenses = {
+      housing: { ...defaults.housing, ...(normalizedData.housing || {}) },
+      insurance: { ...defaults.insurance, ...(normalizedData.insurance || {}) },
+      transportation: { ...defaults.transportation, ...(normalizedData.transportation || {}) },
+      subscriptions: { ...defaults.subscriptions, ...(normalizedData.subscriptions || {}) },
+      childcare: { ...defaults.childcare, ...(normalizedData.childcare || {}) },
+      other: { ...defaults.other, ...(normalizedData.other || {}) },
+      totalFixedExpenses: normalizedData.totalFixedExpenses || defaults.totalFixedExpenses,
+      lastUpdated: normalizedData.lastUpdated || defaults.lastUpdated
+    };
+
+    // Assign all properties safely
+    this.housing = expenses.housing;
+    this.insurance = expenses.insurance;
+    this.transportation = expenses.transportation;
+    this.subscriptions = expenses.subscriptions;
+    this.childcare = expenses.childcare;
+    this.other = expenses.other;
+    this.totalFixedExpenses = expenses.totalFixedExpenses || this.calculateTotalExpenses();
+    this.lastUpdated = expenses.lastUpdated;
+
+    // Add debugging info
+    console.log('FixedExpenses initialized safely:', {
+      inputType: typeof data,
+      hasHousing: !!this.housing,
+      housingTotal: this.housing?.total,
+      totalExpenses: this.totalFixedExpenses
+    });
   }
 
   calculateTotalExpenses() {
+    // Add logging before the forEach to debug what data structure we're working with
+    console.log('Expenses data type:', typeof this.expenses, 'Value:', this.expenses);
+    
     const categories = [this.housing, this.insurance, this.transportation, 
                       this.subscriptions, this.childcare, this.other];
     
     // Calculate totals for each category
     categories.forEach(category => {
+      // Add safety check for category structure
+      if (!category || typeof category !== 'object') {
+        console.error('Invalid category structure in calculateTotalExpenses:', category);
+        return;
+      }
+      
       if (category.total === undefined || category.total === 0) {
         category.total = Object.entries(category)
           .filter(([key]) => key !== 'total')
           .reduce((sum, [, value]) => {
-            if (typeof value === 'object') {
+            if (typeof value === 'object' && value !== null) {
               return sum + Object.values(value).reduce((subSum, subValue) => 
                 subSum + (typeof subValue === 'number' ? subValue : 0), 0);
             }
@@ -403,7 +490,7 @@ export class FixedExpenses {
       }
     });
 
-    return categories.reduce((total, category) => total + category.total, 0);
+    return categories.reduce((total, category) => total + (category?.total || 0), 0);
   }
 
   getHousingRatio(monthlyIncome) {
@@ -703,6 +790,9 @@ export class FinancialProfile {
     },
     lastUpdated = new Date().toISOString()
   } = {}) {
+    // Recursion guards to prevent infinite loops
+    this.calculationDepth = 0;
+    this.MAX_DEPTH = 10;
     this.userProfile = userProfile instanceof UserProfile ? userProfile : new UserProfile(userProfile);
     this.financialObligations = financialObligations instanceof FinancialObligations ? 
       financialObligations : new FinancialObligations(financialObligations);
@@ -720,27 +810,35 @@ export class FinancialProfile {
   }
 
   updateCalculatedFields() {
-    // Update variable expenses total
-    this.variableExpenses.total = Object.entries(this.variableExpenses)
-      .filter(([key]) => key !== 'total')
-      .reduce((sum, [, value]) => sum + (typeof value === 'number' ? value : 0), 0);
+    // Prevent recursive calls
+    if (this.isCalculating) return;
+    this.isCalculating = true;
     
-    // Update asset and obligation totals
-    this.currentAssets.calculateTotalAssets();
-    this.financialObligations.updateTotals();
-    this.fixedExpenses.calculateTotalExpenses();
+    try {
+      // Update variable expenses total
+      this.variableExpenses.total = Object.entries(this.variableExpenses)
+        .filter(([key]) => key !== 'total')
+        .reduce((sum, [, value]) => sum + (typeof value === 'number' ? value : 0), 0);
+      
+      // Update asset and obligation totals
+      this.currentAssets.calculateTotalAssets();
+      this.financialObligations.updateTotals();
+      this.fixedExpenses.calculateTotalExpenses();
     
-    // Calculate net worth
-    this.currentAssets.calculateNetWorth(this.financialObligations.totalDebtAmount);
-    
-    // Update debt-to-income ratio
-    const monthlyIncome = this.userProfile.getMonthlyNetIncome();
-    if (monthlyIncome > 0) {
-      this.financialObligations.debtToIncomeRatio = 
-        (this.financialObligations.totalMonthlyPayments / monthlyIncome) * 100;
+      // Calculate net worth
+      this.currentAssets.calculateNetWorth(this.financialObligations.totalDebtAmount);
+      
+      // Update debt-to-income ratio
+      const monthlyIncome = this.userProfile.getMonthlyNetIncome();
+      if (monthlyIncome > 0) {
+        this.financialObligations.debtToIncomeRatio = 
+          (this.financialObligations.totalMonthlyPayments / monthlyIncome) * 100;
+      }
+      
+      this.lastUpdated = new Date().toISOString();
+    } finally {
+      this.isCalculating = false;
     }
-    
-    this.lastUpdated = new Date().toISOString();
   }
 
   /**
@@ -758,14 +856,38 @@ export class FinancialProfile {
 
   /**
    * Calculate debt payoff timeline using different strategies
+   * LINEAR CALCULATION FLOW to prevent infinite recursion:
+   * 1) Calculate basic timeline with given payments
+   * 2) Store the total interest from that calculation
+   * 3) Calculate interest savings using helper method (not recursive)
+   * 4) Return combined data - never triggers step 1 again
+   * 
    * @param {string} strategy - 'avalanche' (highest interest first) or 'snowball' (smallest balance first)
    * @param {number} extraPayment - Additional monthly payment to apply
    * @returns {Object} Payoff timeline and total interest saved
    */
   calculateDebtPayoffTimeline(strategy = 'avalanche', extraPayment = 0) {
+    // Recursion guard
+    this.calculationDepth++;
+    if (this.calculationDepth > this.MAX_DEPTH) {
+      console.error('Recursion limit hit in calculateDebtPayoffTimeline');
+      this.calculationDepth = 0;
+      return {
+        strategy,
+        totalMonths: 0,
+        totalInterest: 0,
+        payoffOrder: [],
+        monthlyPayments: [],
+        payoffDate: new Date().toISOString().split('T')[0],
+        error: true,
+        errorMessage: 'Calculation too complex - recursion limit reached'
+      };
+    }
+    
     const debts = [...this.financialObligations.debts].filter(debt => debt.status === 'active');
     
     if (debts.length === 0) {
+      this.calculationDepth--;
       return {
         strategy,
         totalMonths: 0,
@@ -871,20 +993,88 @@ export class FinancialProfile {
     const payoffDate = new Date();
     payoffDate.setMonth(payoffDate.getMonth() + currentMonth);
 
+    // Calculate interest saved directly within this method to avoid circular dependency
+    let interestSaved = 0;
+    if (extraPayment > 0) {
+      // Calculate base timeline interest (without extra payment) using stored calculation result
+      const baselineInterest = this.calculateInterestOnly(debts, 0);
+      const acceleratedInterest = Math.round(totalInterestPaid * 100) / 100;
+      interestSaved = Math.max(0, baselineInterest - acceleratedInterest);
+    }
+    
+    // Decrement recursion guard before return
+    this.calculationDepth--;
+    
     return {
       strategy,
       totalMonths: currentMonth,
       totalInterest: Math.round(totalInterestPaid * 100) / 100,
       payoffOrder: payoffSchedule,
       payoffDate: payoffDate.toISOString().split('T')[0],
-      interestSaved: extraPayment > 0 ? this.calculateInterestSaved(extraPayment) : 0
+      interestSaved: interestSaved
     };
   }
 
+  /**
+   * Calculate interest only without triggering full payoff timeline calculations
+   * This breaks the circular dependency that causes infinite recursion
+   */
+  calculateInterestOnly(debts, extraPayment = 0) {
+    let totalInterest = 0;
+    
+    // Calculate interest for each debt independently
+    debts.forEach(debt => {
+      if (debt.currentBalance <= 0 || debt.monthlyPayment <= 0) return;
+      
+      const monthlyRate = debt.interestRate / 100 / 12;
+      const basePayment = debt.monthlyPayment;
+      const totalPayment = basePayment + (extraPayment / debts.length); // Distribute extra payment evenly
+      
+      if (monthlyRate === 0) {
+        // No interest - just return 0
+        return;
+      }
+      
+      // Simple interest calculation without full amortization
+      let balance = debt.currentBalance;
+      let months = 0;
+      const maxMonths = 600; // 50 year safety limit
+      
+      while (balance > 0.01 && months < maxMonths) {
+        const interestPayment = balance * monthlyRate;
+        const principalPayment = Math.max(totalPayment - interestPayment, 0.01); // Ensure some progress
+        
+        if (principalPayment > balance) {
+          totalInterest += balance * monthlyRate * (balance / principalPayment);
+          break;
+        }
+        
+        balance -= principalPayment;
+        totalInterest += interestPayment;
+        months++;
+      }
+    });
+    
+    return Math.round(totalInterest);
+  }
+
   calculateInterestSaved(extraPayment) {
-    const normalPayoff = this.calculateDebtPayoffTimeline('avalanche', 0);
-    const acceleratedPayoff = this.calculateDebtPayoffTimeline('avalanche', extraPayment);
-    return normalPayoff.totalInterest - acceleratedPayoff.totalInterest;
+    // Recursion guard
+    this.calculationDepth++;
+    if (this.calculationDepth > this.MAX_DEPTH) {
+      console.error('Recursion limit hit in calculateInterestSaved');
+      this.calculationDepth = 0;
+      return 0; // Return safe default
+    }
+    
+    // Use the helper method to avoid recursion - this is now the ONLY way to calculate interest savings
+    const normalInterest = this.calculateInterestOnly(this.financialObligations.debts, 0);
+    const acceleratedInterest = this.calculateInterestOnly(this.financialObligations.debts, extraPayment);
+    const result = Math.max(0, normalInterest - acceleratedInterest);
+    
+    // Decrement recursion guard before return
+    this.calculationDepth--;
+    return result;
   }
 
   /**
@@ -1001,6 +1191,36 @@ export class FinancialProfile {
    */
   static fromJSON(data) {
     return new FinancialProfile(data);
+  }
+
+  /**
+   * Create a safe profile with error recovery
+   * @param {Object} data - Profile data (can be incomplete or malformed)
+   * @returns {FinancialProfile} New profile instance with fallbacks
+   */
+  static createSafe(data = {}) {
+    try {
+      // Ensure all required properties exist with safe defaults
+      const safeData = {
+        userProfile: data.userProfile || {},
+        fixedExpenses: data.fixedExpenses || {},
+        financialObligations: data.financialObligations || { debts: [] },
+        currentAssets: data.currentAssets || {},
+        northStarDream: data.northStarDream || {},
+        variableExpenses: data.variableExpenses || {},
+        ...data
+      };
+
+      return new FinancialProfile(safeData);
+    } catch (error) {
+      console.error('Error creating FinancialProfile, using minimal fallback:', error);
+      // Return minimal working profile if all else fails
+      return new FinancialProfile({
+        fixedExpenses: {},
+        financialObligations: { debts: [] },
+        currentAssets: {}
+      });
+    }
   }
 }
 

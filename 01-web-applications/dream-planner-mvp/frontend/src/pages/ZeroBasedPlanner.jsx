@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { ArrowLeft, DollarSign, Target, AlertTriangle, Lightbulb, Move, Plus, Minus, RotateCcw, TrendingUp } from 'lucide-react'
 import { predictMonthlyNeeds, suggestOptimizations } from '../services/spendingIntelligence'
-import { loadDreams } from '../services/localStorage'
+import { DreamService } from '../services/dreamService'
 
 /**
  * Zero-Based Planner Component
@@ -112,7 +112,7 @@ function ZeroBasedPlanner({ onBack }) {
   // Initialize categories and load user data on mount
   useEffect(() => {
     // Load user dreams
-    const dreams = loadDreams()
+    const dreams = DreamService.getUniqueDreams()
     setUserDreams(dreams)
     
     // Generate mock spending history for demo purposes

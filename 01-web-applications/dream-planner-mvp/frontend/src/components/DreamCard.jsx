@@ -144,7 +144,7 @@ const DreamCard = ({ dream, onUpdate }) => {
           <div 
             className="absolute inset-0 w-full h-full rounded-full border-8 border-transparent transition-all duration-1000 ease-out"
             style={{
-              background: `conic-gradient(from 0deg, #3b82f6 0deg, #3b82f6 ${progressPercentage * 3.6}deg, transparent ${progressPercentage * 3.6}deg)`,
+              background: `conic-gradient(from 0deg, var(--primary-color) 0deg, var(--primary-color) ${progressPercentage * 3.6}deg, transparent ${progressPercentage * 3.6}deg)`,
               borderRadius: '50%',
               mask: 'radial-gradient(circle, transparent 50%, black 50%)',
               WebkitMask: 'radial-gradient(circle, transparent 50%, black 50%)'
@@ -171,8 +171,11 @@ const DreamCard = ({ dream, onUpdate }) => {
         </div>
         <div className="w-full bg-gray-200 rounded-full h-2">
           <div 
-            className="bg-blue-500 h-2 rounded-full transition-all duration-1000 ease-out"
-            style={{ width: `${progressPercentage}%` }}
+            className="h-2 rounded-full transition-all duration-1000 ease-out"
+            style={{ 
+              width: `${progressPercentage}%`,
+              backgroundColor: 'var(--primary-color)'
+            }}
           ></div>
         </div>
         <div className="flex items-center justify-between mt-2 text-xs text-gray-500">
@@ -182,22 +185,27 @@ const DreamCard = ({ dream, onUpdate }) => {
       </div>
 
       {/* Daily Savings Target */}
-      <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-100">
+      <div className="mb-6 p-4 rounded-lg border"
+           style={{ 
+             background: `linear-gradient(to right, var(--secondary-color), var(--secondary-color))`,
+             borderColor: 'var(--primary-color)',
+             borderWidth: '1px'
+           }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center">
-            <Target className="w-5 h-5 text-blue-600 mr-2" />
-            <span className="text-sm font-medium text-blue-900">Daily Target</span>
+            <Target className="w-5 h-5 mr-2" style={{ color: 'var(--primary-color)' }} />
+            <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Daily Target</span>
           </div>
           <div className="text-right">
-            <div className="text-2xl font-bold text-blue-600">
+            <div className="text-2xl font-bold" style={{ color: 'var(--primary-color)' }}>
               {formatCurrencyDetailed(dailySavingsTarget)}
             </div>
-            <div className="text-xs text-blue-700">per day</div>
+            <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>per day</div>
           </div>
         </div>
         
         {daysRemaining > 0 && (
-          <div className="flex items-center mt-2 text-xs text-blue-700">
+          <div className="flex items-center mt-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
             <Calendar className="w-3 h-3 mr-1" />
             <span>{daysRemaining} days remaining</span>
           </div>
@@ -225,8 +233,11 @@ const DreamCard = ({ dream, onUpdate }) => {
             className={`w-full py-3 px-4 rounded-lg font-semibold text-white transition-all duration-200 ${
               isUpdating
                 ? 'bg-gray-400 cursor-not-allowed'
-                : 'bg-blue-600 hover:bg-blue-700 hover:shadow-md active:transform active:scale-95'
+                : 'hover:shadow-md active:transform active:scale-95'
             }`}
+            style={isUpdating ? {} : { 
+              backgroundColor: 'var(--primary-color)',
+            }}
           >
             {isUpdating ? (
               <div className="flex items-center justify-center">

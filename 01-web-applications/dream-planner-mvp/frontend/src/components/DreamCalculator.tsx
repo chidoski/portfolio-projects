@@ -5,9 +5,10 @@ import { format, addDays } from 'date-fns'
 
 interface DreamCalculatorProps {
   onBack: () => void
+  isModal?: boolean
 }
 
-export default function DreamCalculator({ onBack }: DreamCalculatorProps) {
+export default function DreamCalculator({ onBack, isModal = false }: DreamCalculatorProps) {
   const [targetAmount, setTargetAmount] = useState('')
   const [targetDate, setTargetDate] = useState('')
   const [currentSaved, setCurrentSaved] = useState('')
@@ -54,21 +55,23 @@ export default function DreamCalculator({ onBack }: DreamCalculatorProps) {
   }
 
   return (
-    <div className="min-h-screen p-4">
-      <div className="max-w-4xl mx-auto">
+    <div className={isModal ? "" : "min-h-screen p-4"}>
+      <div className={isModal ? "" : "max-w-4xl mx-auto"}>
         {/* Header */}
-        <div className="flex items-center mb-8">
-          <button
-            onClick={onBack}
-            className="btn-secondary p-2 mr-4"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Dream Calculator</h1>
-            <p className="text-gray-600">See how achievable your dreams really are</p>
+        {!isModal && (
+          <div className="flex items-center mb-8">
+            <button
+              onClick={onBack}
+              className="btn-secondary p-2 mr-4"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Dream Calculator</h1>
+              <p className="text-gray-600">See how achievable your dreams really are</p>
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="grid lg:grid-cols-2 gap-8">
           {/* Input Form */}

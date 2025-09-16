@@ -129,17 +129,17 @@ function MeshGradientDemo() {
               <h3 className="text-lg font-semibold mb-4 text-gray-800">Color Palette</h3>
               <div className="flex flex-wrap justify-center gap-2">
                 {[
-                  { color: '#667eea', name: 'Soft Blue' },
-                  { color: '#764ba2', name: 'Purple' },
-                  { color: '#f093fb', name: 'Pink' },
-                  { color: '#a8edea', name: 'Mint' },
-                  { color: '#fed6e3', name: 'Blush' },
-                  { color: '#d299c2', name: 'Lavender' }
+                  { color: 'var(--primary-color)', name: 'Professional Teal' },
+                  { color: 'var(--secondary-color)', name: 'Light Background' },
+                  { color: 'var(--accent-color)', name: 'Coral Accent' },
+                  { color: 'var(--success-green)', name: 'Success Green' },
+                  { color: 'var(--text-primary)', name: 'Primary Text' },
+                  { color: 'var(--text-secondary)', name: 'Secondary Text' }
                 ].map(({ color, name }) => (
                   <div key={color} className="text-center">
                     <div 
                       className="w-12 h-12 rounded-full border-2 border-white shadow-lg"
-                      style={{ backgroundColor: color }}
+                      style={{ backgroundColor: color.startsWith('#') ? color : undefined, background: color.startsWith('var') ? color : undefined }}
                     ></div>
                     <p className="text-xs text-gray-600 mt-1">{name}</p>
                   </div>

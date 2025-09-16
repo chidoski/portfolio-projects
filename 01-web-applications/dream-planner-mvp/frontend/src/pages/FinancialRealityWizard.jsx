@@ -18,12 +18,15 @@ const FinancialRealityWizard = ({ onComplete, onBack }) => {
   const [payoffTimelines, setPayoffTimelines] = useState(null);
   const [selectedOptimizationScenario, setSelectedOptimizationScenario] = useState(null);
   const [profileError, setProfileError] = useState(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('');
   
   // Fixed expenses state
   const [expenses, setExpenses] = useState({
     housing: '',
-    everythingElse: '',
-    // Detailed breakdown (initially hidden)
+    // Quick mode field
+    allOtherEssentials: '',
+    // Detailed breakdown
     utilities: '',
     insurance: '',
     groceries: '',
@@ -31,8 +34,16 @@ const FinancialRealityWizard = ({ onComplete, onBack }) => {
     subscriptions: '',
     other: ''
   });
+  const [totalExpenses, setTotalExpenses] = useState(0);
   const [showDetailedExpenses, setShowDetailedExpenses] = useState(false);
   const [freedomRatio, setFreedomRatio] = useState(null);
+  const [expenseWarnings, setExpenseWarnings] = useState({});
+  const [smartDefaults, setSmartDefaults] = useState({});
+  const [quickMode, setQuickMode] = useState(() => {
+    // Load saved preference from localStorage
+    const savedMode = localStorage.getItem('expenseInputMode');
+    return savedMode ? JSON.parse(savedMode) : false;
+  });
 
   // Friendly debt categories with encouraging descriptions
   const debtCategories = [
@@ -97,7 +108,47 @@ const FinancialRealityWizard = ({ onComplete, onBack }) => {
     try {
       const savedProfile = localStorage.getItem('financialProfile');
       const profileData = savedProfile ? JSON.parse(savedProfile) : null;
-      const profile = profileData ? new FinancialProfile(profileData) : new FinancialProfile();
+      
+      // Enhanced validation for income data before creating profile
+      let profile;
+      if (profileData) {
+        // Ensure userProfile exists and has valid income data
+        if (!profileData.userProfile) {
+          profileData.userProfile = {};
+        }
+        if (!profileData.userProfile.income) {
+          profileData.userProfile.income = { gross: { annual: 0 }, net: { annual: 0 }, taxRate: 0.22 };
+        }
+        if (!profileData.userProfile.income.gross) {
+          profileData.userProfile.income.gross = { annual: 0 };
+        }
+        
+        // Add validation: ensure income values are numbers
+        let annualIncome = parseFloat(profileData.userProfile.income.gross.annual) || 0;
+        
+        // If no income found in profile, try to retrieve from separate storage
+        if (annualIncome === 0) {
+          try {
+            const savedIncome = JSON.parse(localStorage.getItem('userIncome') || '{}');
+            annualIncome = parseFloat(savedIncome.annual) || 0;
+            console.log('Retrieved income from userIncome storage:', annualIncome);
+          } catch (error) {
+            console.warn('Could not retrieve income from userIncome storage:', error);
+          }
+        }
+        
+        if (annualIncome === 0) {
+          console.warn('No valid income found in any storage. Income:', profileData.userProfile.income.gross.annual);
+        }
+        
+        // Ensure the annual income is properly set as a number
+        profileData.userProfile.income.gross.annual = annualIncome;
+        
+        profile = new FinancialProfile(profileData);
+      } else {
+        profile = new FinancialProfile();
+      }
+      
       setFinancialProfile(profile);
       
       // Load existing debts if any
@@ -109,21 +160,19 @@ const FinancialRealityWizard = ({ onComplete, onBack }) => {
       if (profile.fixedExpenses) {
         const loadedExpenses = {
           housing: profile.fixedExpenses.housing?.total || '',
-          everythingElse: '',
           utilities: profile.fixedExpenses.utilities?.total || '',
           insurance: profile.fixedExpenses.insurance?.total || '',
-          groceries: '',
+          groceries: profile.fixedExpenses.groceries?.total || '',
           transportation: profile.fixedExpenses.transportation?.total || '',
           subscriptions: profile.fixedExpenses.subscriptions?.total || '',
           other: profile.fixedExpenses.other?.total || ''
         };
         
-        // Calculate "everything else" from detailed expenses
-        const detailedTotal = ['utilities', 'insurance', 'transportation', 'subscriptions', 'other']
-          .reduce((sum, key) => sum + (parseFloat(loadedExpenses[key]) || 0), 0);
+        // Check if we have any detailed expenses to determine if we should show detailed view
+        const hasDetailedExpenses = ['utilities', 'insurance', 'groceries', 'transportation', 'subscriptions', 'other']
+          .some(key => parseFloat(loadedExpenses[key]) > 0);
         
-        if (detailedTotal > 0) {
-          loadedExpenses.everythingElse = detailedTotal.toString();
+        if (hasDetailedExpenses) {
           setShowDetailedExpenses(true);
         }
         
@@ -136,7 +185,7 @@ const FinancialRealityWizard = ({ onComplete, onBack }) => {
     }
   }, []);
 
-  // Save to localStorage whenever debts change
+  // Save to localStorage whenever debts change (with infinite loop prevention)
   useEffect(() => {
     if (financialProfile && debts.length > 0) {
       try {
@@ -173,7 +222,14 @@ const FinancialRealityWizard = ({ onComplete, onBack }) => {
           // Continue without localStorage - don't block the user
         }
         
-        setFinancialProfile(properProfile);
+        // Use a ref to prevent infinite loops when updating the profile
+        // Only update if the profile has actually changed (check by comparing serialized data)
+        const currentProfileString = JSON.stringify(financialProfile.toJSON ? financialProfile.toJSON() : financialProfile);
+        const newProfileString = JSON.stringify(properProfile.toJSON());
+        
+        if (currentProfileString !== newProfileString) {
+          setFinancialProfile(properProfile);
+        }
       } catch (error) {
         console.error('Error updating profile:', error);
         setProfileError('There was an issue updating your financial profile. Your debts have been saved, but some calculations may not be current.');
@@ -181,6 +237,115 @@ const FinancialRealityWizard = ({ onComplete, onBack }) => {
       }
     }
   }, [debts]);
+
+  // Calculate smart defaults based on income and location
+  const calculateSmartDefaults = () => {
+    let monthlyIncome = 0;
+    let state = '';
+    
+    try {
+      if (financialProfile?.userProfile) {
+        monthlyIncome = financialProfile.userProfile.getMonthlyNetIncome();
+        state = financialProfile.userProfile.location?.state || '';
+      }
+      // Fallback to saved income
+      if (monthlyIncome <= 0) {
+        const savedIncome = JSON.parse(localStorage.getItem('userIncome') || '{}');
+        monthlyIncome = parseFloat(savedIncome.monthly) || 0;
+      }
+    } catch (error) {
+      console.warn('Could not get income for smart defaults:', error);
+    }
+
+    if (monthlyIncome <= 0) {
+      return {};
+    }
+
+    // Base percentages of net monthly income for different categories
+    const basePercentages = {
+      groceries: 0.10,    // 10% for food
+      utilities: 0.03,    // 3% for utilities
+      transportation: 0.08, // 8% for transportation
+      insurance: 0.04,    // 4% for insurance
+      subscriptions: 0.01 // 1% for subscriptions
+    };
+
+    // Adjust for high-cost locations
+    const highCostStates = ['California', 'New York', 'Hawaii', 'Massachusetts', 'Connecticut'];
+    const mediumCostStates = ['Washington', 'Colorado', 'Illinois', 'Virginia', 'Maryland'];
+    
+    let multiplier = 1.0;
+    if (highCostStates.includes(state)) {
+      multiplier = 1.3; // 30% higher in high-cost areas
+    } else if (mediumCostStates.includes(state)) {
+      multiplier = 1.15; // 15% higher in medium-cost areas
+    }
+
+    const defaults = {};
+    Object.entries(basePercentages).forEach(([category, percentage]) => {
+      const amount = Math.round(monthlyIncome * percentage * multiplier);
+      defaults[category] = amount;
+    });
+
+    return defaults;
+  };
+
+  // Calculate smart defaults when financial profile is available
+  useEffect(() => {
+    if (financialProfile) {
+      const defaults = calculateSmartDefaults();
+      setSmartDefaults(defaults);
+    }
+  }, [financialProfile]);
+
+  // Handle quick mode toggle
+  const handleQuickModeToggle = (enabled) => {
+    setQuickMode(enabled);
+    localStorage.setItem('expenseInputMode', JSON.stringify(enabled));
+    
+    // If switching to quick mode and we have detailed expenses, consolidate them
+    if (enabled && (expenses.groceries || expenses.utilities || expenses.transportation || expenses.insurance || expenses.subscriptions || expenses.other)) {
+      const detailedTotal = (parseFloat(expenses.groceries) || 0) + 
+                           (parseFloat(expenses.utilities) || 0) + 
+                           (parseFloat(expenses.transportation) || 0) + 
+                           (parseFloat(expenses.insurance) || 0) + 
+                           (parseFloat(expenses.subscriptions) || 0) + 
+                           (parseFloat(expenses.other) || 0);
+      
+      if (detailedTotal > 0) {
+        setExpenses(prev => ({
+          ...prev,
+          allOtherEssentials: detailedTotal.toString(),
+          groceries: '',
+          utilities: '',
+          transportation: '',
+          insurance: '',
+          subscriptions: '',
+          other: ''
+        }));
+      }
+    }
+  };
+
+  // Calculate total expenses automatically
+  useEffect(() => {
+    let total = parseFloat(expenses.housing) || 0;
+    
+    if (quickMode) {
+      // In quick mode, use the consolidated field
+      total += parseFloat(expenses.allOtherEssentials) || 0;
+    } else {
+      // In detailed mode, sum all individual fields
+      total += (parseFloat(expenses.groceries) || 0) + 
+               (parseFloat(expenses.utilities) || 0) + 
+               (parseFloat(expenses.transportation) || 0) + 
+               (parseFloat(expenses.insurance) || 0) + 
+               (parseFloat(expenses.subscriptions) || 0) + 
+               (parseFloat(expenses.other) || 0);
+    }
+    
+    setTotalExpenses(total);
+  }, [quickMode, expenses.housing, expenses.allOtherEssentials, expenses.groceries, expenses.utilities, expenses.transportation, expenses.insurance, expenses.subscriptions, expenses.other]);
 
   // Calculate freedom ratio when debts or financial profile changes
   useEffect(() => {
@@ -223,6 +388,9 @@ const FinancialRealityWizard = ({ onComplete, onBack }) => {
       // Calculate freedom ratio when expenses change
       calculateFreedomRatio(updated);
       
+      // Validate expense value
+      validateExpenseValue(field, value);
+      
       return updated;
     });
   };
@@ -235,6 +403,8 @@ const FinancialRealityWizard = ({ onComplete, onBack }) => {
       if (formatted.toString() !== value) {
         setExpenses(prev => ({ ...prev, [field]: formatted.toString() }));
       }
+      // Validate the final value
+      validateExpenseValue(field, formatted.toString());
     }
   };
 
@@ -258,6 +428,73 @@ const FinancialRealityWizard = ({ onComplete, onBack }) => {
     });
   };
 
+  // Validate expense values against monthly income
+  const validateExpenseValue = (field, value) => {
+    if (!value || value === '') {
+      // Clear any existing warning for this field
+      setExpenseWarnings(prev => {
+        const updated = { ...prev };
+        delete updated[field];
+        return updated;
+      });
+      return;
+    }
+
+    const expenseAmount = parseFloat(value);
+    if (isNaN(expenseAmount) || expenseAmount <= 0) {
+      return;
+    }
+
+    // Get monthly income
+    let monthlyIncome = 0;
+    try {
+      if (financialProfile?.userProfile) {
+        monthlyIncome = financialProfile.userProfile.getMonthlyNetIncome();
+      }
+      // Fallback to saved income
+      if (monthlyIncome <= 0) {
+        const savedIncome = JSON.parse(localStorage.getItem('userIncome') || '{}');
+        monthlyIncome = parseFloat(savedIncome.monthly) || 0;
+      }
+    } catch (error) {
+      console.warn('Could not get monthly income for validation:', error);
+    }
+
+    if (monthlyIncome <= 0) {
+      return; // Can't validate without income
+    }
+
+    // Check if expense is more than 25% of monthly income
+    const percentageOfIncome = (expenseAmount / monthlyIncome) * 100;
+    
+    if (percentageOfIncome > 25) {
+      let warningMessage = '';
+      if (field === 'groceries') {
+        warningMessage = 'This seems high - did you mean to enter an annual amount?';
+      } else if (field === 'housing') {
+        warningMessage = 'This is quite high for housing. Most financial experts recommend 30% or less of income for housing.';
+      } else {
+        warningMessage = `This seems high for ${field} - over 25% of your monthly income.`;
+      }
+
+      setExpenseWarnings(prev => ({
+        ...prev,
+        [field]: {
+          message: warningMessage,
+          percentage: Math.round(percentageOfIncome),
+          monthlyIncome: Math.round(monthlyIncome)
+        }
+      }));
+    } else {
+      // Clear warning if amount is reasonable
+      setExpenseWarnings(prev => {
+        const updated = { ...prev };
+        delete updated[field];
+        return updated;
+      });
+    }
+  };
+
   // Calculate Freedom Ratio
   const calculateFreedomRatio = (currentExpenses = expenses) => {
     try {
@@ -267,12 +504,25 @@ const FinancialRealityWizard = ({ onComplete, onBack }) => {
       let monthlyIncome = 0;
       try {
         monthlyIncome = financialProfile.userProfile.getMonthlyNetIncome();
+        
+        // Add detailed logging before the calculation
+        console.log('Income value:', monthlyIncome, 'Type:', typeof monthlyIncome);
+        console.log('Financial profile:', financialProfile);
+        console.log('User profile:', financialProfile.userProfile);
+        
       } catch (incomeError) {
         console.error('Error calculating monthly income:', incomeError);
         return;
       }
       
-      if (monthlyIncome <= 0) return;
+      // Add validation: ensure income is a valid number
+      const numericIncome = parseFloat(monthlyIncome) || 0;
+      if (numericIncome === 0) {
+        console.error('No income value found! Income:', monthlyIncome);
+        return;
+      }
+      
+      if (numericIncome <= 0) return;
       
       // Calculate total monthly obligations with error handling
       let totalDebts = 0;
@@ -286,32 +536,48 @@ const FinancialRealityWizard = ({ onComplete, onBack }) => {
         totalDebts = 0;
       }
       
-      let totalExpenses = 0;
+      let calculatedExpenses = 0;
       try {
-        if (showDetailedExpenses) {
-          // Use detailed breakdown
-          totalExpenses = Object.entries(currentExpenses)
-            .filter(([key]) => key !== 'housing' && key !== 'everythingElse')
-            .reduce((sum, [, value]) => sum + (parseFloat(value) || 0), 0);
+        // Sum expense fields based on mode
+        calculatedExpenses = parseFloat(currentExpenses.housing) || 0;
+        
+        if (quickMode) {
+          calculatedExpenses += parseFloat(currentExpenses.allOtherEssentials) || 0;
         } else {
-          // Use simple breakdown
-          totalExpenses = (parseFloat(currentExpenses.housing) || 0) + (parseFloat(currentExpenses.everythingElse) || 0);
+          calculatedExpenses += (parseFloat(currentExpenses.groceries) || 0) + 
+                               (parseFloat(currentExpenses.utilities) || 0) + 
+                               (parseFloat(currentExpenses.transportation) || 0) + 
+                               (parseFloat(currentExpenses.insurance) || 0) + 
+                               (parseFloat(currentExpenses.subscriptions) || 0) + 
+                               (parseFloat(currentExpenses.other) || 0);
         }
+        
+        // Add detailed logging for expenses
+        console.log('Total expenses:', calculatedExpenses, 'Type:', typeof calculatedExpenses);
+        console.log('Current expenses object:', currentExpenses);
+        console.log('Show detailed expenses:', showDetailedExpenses);
+        
       } catch (expensesError) {
         console.error('Error calculating total expenses:', expensesError);
-        totalExpenses = 0;
+        calculatedExpenses = 0;
       }
       
-      const totalObligations = totalDebts + totalExpenses;
-      const freedomAmount = monthlyIncome - totalObligations;
-      const ratio = (freedomAmount / monthlyIncome) * 100;
+      const totalObligations = totalDebts + calculatedExpenses;
+      const freedomAmount = numericIncome - totalObligations;
+      const ratio = (freedomAmount / numericIncome) * 100;
+      
+      // Defensive programming to prevent NaN from appearing in the UI
+      const safeRatio = isNaN(ratio) ? 0 : Math.max(0, Math.round(ratio));
+      const safeFreedomAmount = isNaN(freedomAmount) ? 0 : Math.max(0, freedomAmount);
+      const safeMonthlyIncome = isNaN(numericIncome) ? 0 : numericIncome;
+      const safeTotalObligations = isNaN(totalObligations) ? 0 : totalObligations;
       
       setFreedomRatio({
-        percentage: Math.max(0, ratio),
-        freedomAmount: Math.max(0, freedomAmount),
-        monthlyIncome,
-        totalObligations,
-        isHealthy: ratio >= 20
+        percentage: safeRatio,
+        freedomAmount: safeFreedomAmount,
+        monthlyIncome: safeMonthlyIncome,
+        totalObligations: safeTotalObligations,
+        isHealthy: safeRatio >= 20
       });
     } catch (error) {
       console.error('Error calculating freedom ratio:', error);
@@ -481,10 +747,51 @@ const FinancialRealityWizard = ({ onComplete, onBack }) => {
     }
   };
 
-  // Navigation functions
-  const nextStep = () => {
-    if (currentStep < steps.length - 1) {
-      setCurrentStep(currentStep + 1);
+  // Navigation functions - Modified to handle heavy calculation with loading state
+  const nextStep = async () => {
+    if (isProcessing) return; // Prevent multiple clicks
+    
+    // Check if we're moving from fixed-expenses to review-and-calculate (the "See My Complete Picture" transition)
+    if (currentStep === 3 && steps[currentStep] === 'fixed-expenses') {
+      setIsProcessing(true);
+      setLoadingMessage('Creating your financial profile...');
+      
+      // Use setTimeout to defer execution to next tick
+      setTimeout(() => {
+        try {
+          // Create the complete financial profile with all collected data
+          const profileData = {
+            userProfile: financialProfile?.userProfile || {},
+            financialObligations: financialProfile?.financialObligations || { debts: [] },
+            fixedExpenses: financialProfile?.fixedExpenses || {},
+            currentAssets: financialProfile?.currentAssets || {},
+            northStarDream: financialProfile?.northStarDream || {},
+            variableExpenses: financialProfile?.variableExpenses || {},
+            lastUpdated: new Date().toISOString()
+          };
+          
+          const completeProfile = new FinancialProfile(profileData);
+          
+          // Save and navigate
+          localStorage.setItem('completeProfile', JSON.stringify(completeProfile.toJSON()));
+          
+          // Move to next step
+          if (currentStep < steps.length - 1) {
+            setCurrentStep(currentStep + 1);
+          }
+        } catch (error) {
+          console.error('Failed to create complete profile:', error);
+          setProfileError('There was an issue creating your complete financial profile. Please try again.');
+        } finally {
+          setIsProcessing(false);
+          setLoadingMessage('');
+        }
+      }, 100);
+    } else {
+      // Normal step advancement for other steps
+      if (currentStep < steps.length - 1) {
+        setCurrentStep(currentStep + 1);
+      }
     }
   };
 
@@ -832,6 +1139,48 @@ const FinancialRealityWizard = ({ onComplete, onBack }) => {
       </div>
 
       <div className="bg-white rounded-xl p-8 shadow-lg">
+        {/* Quick Mode Toggle */}
+        <div className="mb-8 p-4 bg-gray-50 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="font-semibold text-gray-800 mb-1">Input Mode</h4>
+              <p className="text-sm text-gray-600">
+                Choose your preferred level of detail
+              </p>
+            </div>
+            <div className="flex items-center space-x-4">
+              <label className="flex items-center cursor-pointer">
+                <input
+                  type="radio"
+                  checked={quickMode}
+                  onChange={() => handleQuickModeToggle(true)}
+                  className="mr-2"
+                />
+                <span className="text-sm font-medium text-gray-700">Quick Mode</span>
+              </label>
+              <label className="flex items-center cursor-pointer">
+                <input
+                  type="radio"
+                  checked={!quickMode}
+                  onChange={() => handleQuickModeToggle(false)}
+                  className="mr-2"
+                />
+                <span className="text-sm font-medium text-gray-700">Detailed Mode</span>
+              </label>
+            </div>
+          </div>
+          {quickMode && (
+            <div className="mt-2 text-xs text-blue-600">
+              ⚡ Simplified inputs - just housing and one "everything else" field
+            </div>
+          )}
+          {!quickMode && (
+            <div className="mt-2 text-xs text-green-600">
+              🔍 Detailed breakdown - individual categories for better insights
+            </div>
+          )}
+        </div>
+
         <div className="space-y-8">
           {/* Housing Payment */}
           <div>
@@ -851,84 +1200,98 @@ const FinancialRealityWizard = ({ onComplete, onBack }) => {
                 onChange={(e) => handleExpenseChange('housing', e.target.value)}
                 onBlur={(e) => handleExpenseBlur('housing', e.target.value)}
                 placeholder="0.00"
-                className="w-full pl-8 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none text-lg"
+                className={`w-full pl-8 pr-4 py-4 border-2 rounded-xl focus:outline-none text-lg ${
+                  expenseWarnings.housing 
+                    ? 'border-red-300 focus:border-red-500' 
+                    : 'border-gray-200 focus:border-blue-500'
+                }`}
               />
             </div>
+            {expenseWarnings.housing && (
+              <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <div className="flex items-start">
+                  <AlertCircle className="w-4 h-4 text-yellow-600 mt-0.5 mr-2 flex-shrink-0" />
+                  <div className="text-sm">
+                    <div className="text-yellow-800 font-medium">
+                      {expenseWarnings.housing.message}
+                    </div>
+                    <div className="text-yellow-700 mt-1">
+                      This is {expenseWarnings.housing.percentage}% of your monthly income 
+                      (${expenseWarnings.housing.monthlyIncome.toLocaleString()}).
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Everything Else Essential */}
-          <div>
-            <label className="block text-xl font-semibold text-gray-700 mb-3">
-              <ShoppingCart className="w-6 h-6 inline mr-2 text-green-600" />
-              Everything else essential
-            </label>
-            <p className="text-gray-600 mb-4">
-              Food, utilities, insurance, transportation - all the other must-haves
-            </p>
-            <div className="relative">
-              <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 text-lg">$</span>
-              <input
-                type="number"
-                step="0.01"
-                value={expenses.everythingElse}
-                onChange={(e) => handleExpenseChange('everythingElse', e.target.value)}
-                onBlur={(e) => handleExpenseBlur('everythingElse', e.target.value)}
-                placeholder="0.00"
-                className="w-full pl-8 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none text-lg"
-              />
-            </div>
-          </div>
-
-          {/* Progressive Disclosure Button */}
-          {!showDetailedExpenses && (expenses.housing || expenses.everythingElse) && (
-            <div className="text-center space-y-3">
-              <button
-                onClick={() => {
-                  setShowDetailedExpenses(true);
-                  // Transfer "everything else" to detailed categories for easier editing
-                  if (expenses.everythingElse && !expenses.groceries) {
-                    const everythingElseAmount = parseFloat(expenses.everythingElse) || 0;
-                    // Use proper rounding to avoid floating point errors
-                    const estimatedBreakdown = {
-                      groceries: (Math.round(everythingElseAmount * 0.3 * 100) / 100).toString(),
-                      utilities: (Math.round(everythingElseAmount * 0.2 * 100) / 100).toString(),
-                      transportation: (Math.round(everythingElseAmount * 0.25 * 100) / 100).toString(),
-                      insurance: (Math.round(everythingElseAmount * 0.15 * 100) / 100).toString(),
-                      subscriptions: (Math.round(everythingElseAmount * 0.05 * 100) / 100).toString(),
-                      other: (Math.round(everythingElseAmount * 0.05 * 100) / 100).toString()
-                    };
-                    setExpenses(prev => ({ ...prev, ...estimatedBreakdown }));
-                  }
-                }}
-                className="text-blue-600 hover:text-blue-800 font-medium transition-colors flex items-center mx-auto"
-              >
-                <TrendingUp className="w-4 h-4 mr-2" />
-                Want to break this down for better accuracy?
-              </button>
-              
-              {/* Clean Numbers Button */}
-              <button
-                onClick={cleanExpenseValues}
-                className="text-xs text-gray-500 hover:text-gray-700 transition-colors"
-              >
-                🔧 Clean up decimal places
-              </button>
+          {/* Quick Mode: All Other Essentials */}
+          {quickMode && (
+            <div>
+              <label className="block text-xl font-semibold text-gray-700 mb-3">
+                <ShoppingCart className="w-6 h-6 inline mr-2 text-green-600" />
+                All other monthly essentials
+              </label>
+              <p className="text-gray-600 mb-4">
+                Food, utilities, insurance, transportation, subscriptions - all the other must-haves combined
+              </p>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 text-lg">$</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={expenses.allOtherEssentials}
+                  onChange={(e) => handleExpenseChange('allOtherEssentials', e.target.value)}
+                  onBlur={(e) => handleExpenseBlur('allOtherEssentials', e.target.value)}
+                  placeholder="0.00"
+                  className={`w-full pl-8 pr-4 py-4 border-2 rounded-xl focus:outline-none text-lg ${
+                    expenseWarnings.allOtherEssentials 
+                      ? 'border-red-300 focus:border-red-500' 
+                      : 'border-gray-200 focus:border-blue-500'
+                  }`}
+                />
+              </div>
+              {expenseWarnings.allOtherEssentials && (
+                <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <div className="flex items-start">
+                    <AlertCircle className="w-4 h-4 text-yellow-600 mt-0.5 mr-2 flex-shrink-0" />
+                    <div className="text-sm">
+                      <div className="text-yellow-800 font-medium">
+                        {expenseWarnings.allOtherEssentials.message}
+                      </div>
+                      <div className="text-yellow-700 mt-1">
+                        This is {expenseWarnings.allOtherEssentials.percentage}% of your monthly income 
+                        (${expenseWarnings.allOtherEssentials.monthlyIncome.toLocaleString()}).
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
-          {/* Detailed Breakdown */}
-          {showDetailedExpenses && (
-            <div className="space-y-6 border-t pt-6">
-              <div className="text-center mb-6">
-                <h3 className="text-lg font-semibold text-gray-800 mb-2">
-                  Let's get more specific
-                </h3>
-                <p className="text-gray-600 text-sm">
-                  This helps us give you better insights about your financial flexibility
-                </p>
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-6">
+          {/* Detailed Breakdown - Only in Detailed Mode */}
+          {!quickMode && (
+            <div className="border-t pt-6">
+            <div className="text-center mb-6">
+              <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                Monthly Essentials Breakdown
+              </h3>
+              <p className="text-gray-600 text-sm">
+                Let's get specific about your monthly expenses for better insights
+              </p>
+              {Object.keys(smartDefaults).length > 0 && (
+                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="text-blue-800 text-sm font-medium mb-1">
+                    💡 Smart Suggestions
+                  </div>
+                  <div className="text-blue-700 text-xs">
+                    We've suggested typical amounts based on your income and location - adjust to match your situation
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="grid md:grid-cols-2 gap-6 mt-6">
                 {/* Groceries */}
                 <div>
                   <label className="block font-medium text-gray-700 mb-2">
@@ -943,10 +1306,35 @@ const FinancialRealityWizard = ({ onComplete, onBack }) => {
                       value={expenses.groceries}
                       onChange={(e) => handleExpenseChange('groceries', e.target.value)}
                       onBlur={(e) => handleExpenseBlur('groceries', e.target.value)}
-                      placeholder="0.00"
-                      className="w-full pl-7 pr-3 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:outline-none"
+                      placeholder={smartDefaults.groceries ? `${smartDefaults.groceries} (suggested)` : "0.00"}
+                      className={`w-full pl-7 pr-3 py-3 border-2 rounded-lg focus:outline-none ${
+                        expenseWarnings.groceries 
+                          ? 'border-red-300 focus:border-red-500' 
+                          : 'border-gray-200 focus:border-blue-500'
+                      }`}
                     />
                   </div>
+                  {expenseWarnings.groceries && (
+                    <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <div className="flex items-start">
+                        <AlertCircle className="w-4 h-4 text-yellow-600 mt-0.5 mr-2 flex-shrink-0" />
+                        <div className="text-sm">
+                          <div className="text-yellow-800 font-medium">
+                            {expenseWarnings.groceries.message}
+                          </div>
+                          <div className="text-yellow-700 mt-1">
+                            This is {expenseWarnings.groceries.percentage}% of your monthly income 
+                            (${expenseWarnings.groceries.monthlyIncome.toLocaleString()}).
+                          </div>
+                          <div className="text-yellow-600 text-xs mt-1">
+                            For a ${Math.round(expenseWarnings.groceries.monthlyIncome * 12 / 1000)}k income, 
+                            monthly groceries over ${Math.round(expenseWarnings.groceries.monthlyIncome * 0.25).toLocaleString()} 
+                            should be double-checked.
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Utilities */}
@@ -963,7 +1351,7 @@ const FinancialRealityWizard = ({ onComplete, onBack }) => {
                       value={expenses.utilities}
                       onChange={(e) => handleExpenseChange('utilities', e.target.value)}
                       onBlur={(e) => handleExpenseBlur('utilities', e.target.value)}
-                      placeholder="0.00"
+                      placeholder={smartDefaults.utilities ? `${smartDefaults.utilities} (suggested)` : "0.00"}
                       className="w-full pl-7 pr-3 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:outline-none"
                     />
                   </div>
@@ -983,7 +1371,7 @@ const FinancialRealityWizard = ({ onComplete, onBack }) => {
                       value={expenses.transportation}
                       onChange={(e) => handleExpenseChange('transportation', e.target.value)}
                       onBlur={(e) => handleExpenseBlur('transportation', e.target.value)}
-                      placeholder="0.00"
+                      placeholder={smartDefaults.transportation ? `${smartDefaults.transportation} (suggested)` : "0.00"}
                       className="w-full pl-7 pr-3 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:outline-none"
                     />
                   </div>
@@ -1003,7 +1391,7 @@ const FinancialRealityWizard = ({ onComplete, onBack }) => {
                       value={expenses.insurance}
                       onChange={(e) => handleExpenseChange('insurance', e.target.value)}
                       onBlur={(e) => handleExpenseBlur('insurance', e.target.value)}
-                      placeholder="0.00"
+                      placeholder={smartDefaults.insurance ? `${smartDefaults.insurance} (suggested)` : "0.00"}
                       className="w-full pl-7 pr-3 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:outline-none"
                     />
                   </div>
@@ -1023,7 +1411,7 @@ const FinancialRealityWizard = ({ onComplete, onBack }) => {
                       value={expenses.subscriptions}
                       onChange={(e) => handleExpenseChange('subscriptions', e.target.value)}
                       onBlur={(e) => handleExpenseBlur('subscriptions', e.target.value)}
-                      placeholder="0.00"
+                      placeholder={smartDefaults.subscriptions ? `${smartDefaults.subscriptions} (suggested)` : "0.00"}
                       className="w-full pl-7 pr-3 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:outline-none"
                     />
                   </div>
@@ -1050,35 +1438,27 @@ const FinancialRealityWizard = ({ onComplete, onBack }) => {
                 </div>
               </div>
 
-              <div className="text-center space-y-2">
-                <button
-                  onClick={() => {
-                    setShowDetailedExpenses(false);
-                    // Consolidate detailed expenses back to "everything else"
-                    const detailedTotal = ['utilities', 'insurance', 'groceries', 'transportation', 'subscriptions', 'other']
-                      .reduce((sum, key) => sum + (parseFloat(expenses[key]) || 0), 0);
-                    // Use proper rounding to avoid floating point errors
-                    const roundedTotal = Math.round(detailedTotal * 100) / 100;
-                    setExpenses(prev => ({ 
-                      ...prev, 
-                      everythingElse: roundedTotal.toString(),
-                      utilities: '', insurance: '', groceries: '', transportation: '', subscriptions: '', other: ''
-                    }));
-                  }}
-                  className="text-gray-600 hover:text-gray-800 text-sm transition-colors"
-                >
-                  ← Back to simple view
-                </button>
-                
-                {/* Clean Numbers Button for detailed view */}
-                <div>
-                  <button
-                    onClick={cleanExpenseValues}
-                    className="text-xs text-gray-500 hover:text-gray-700 transition-colors"
-                  >
-                    🔧 Clean up decimal places
-                  </button>
+              {/* Running Total Display */}
+              <div className="col-span-full mt-6 pt-4 border-t border-gray-200">
+                <div className="text-center">
+                  <div className="text-sm text-gray-600 mb-1">Total monthly essentials:</div>
+                  <div className="text-2xl font-bold text-blue-600">
+                    ${totalExpenses.toLocaleString()}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    Updates automatically as you fill in each field
+                  </div>
                 </div>
+              </div>
+
+              {/* Clean Numbers Button */}
+              <div className="col-span-full text-center mt-4">
+                <button
+                  onClick={cleanExpenseValues}
+                  className="text-xs text-gray-500 hover:text-gray-700 transition-colors"
+                >
+                  🔧 Clean up decimal places
+                </button>
               </div>
             </div>
           )}
@@ -1096,53 +1476,64 @@ const FinancialRealityWizard = ({ onComplete, onBack }) => {
               </p>
             </div>
 
-            <div className="flex items-center justify-center mb-6">
-              <div className="relative w-32 h-32">
-                <svg className="w-32 h-32 transform -rotate-90" viewBox="0 0 120 120">
-                  <circle
-                    cx="60"
-                    cy="60"
-                    r="50"
-                    stroke="#e5e7eb"
-                    strokeWidth="8"
-                    fill="none"
-                  />
-                  <circle
-                    cx="60"
-                    cy="60"
-                    r="50"
-                    stroke={freedomRatio.isHealthy ? "#10b981" : freedomRatio.percentage > 10 ? "#f59e0b" : "#ef4444"}
-                    strokeWidth="8"
-                    fill="none"
-                    strokeDasharray={`${(freedomRatio.percentage / 100) * 314} 314`}
-                    strokeLinecap="round"
-                    className="transition-all duration-1000 ease-out"
-                  />
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="text-center">
-                    <div className={`text-2xl font-bold ${freedomRatio.isHealthy ? 'text-green-600' : freedomRatio.percentage > 10 ? 'text-yellow-600' : 'text-red-600'}`}>
-                      {Math.round(freedomRatio.percentage)}%
+            {freedomRatio.error || freedomRatio.monthlyIncome === 0 ? (
+              <div className="text-center p-6">
+                <div className="text-gray-500 mb-2">⚙️ Calculating...</div>
+                <p className="text-sm text-gray-600">
+                  We're still gathering your income information from the previous step.
+                </p>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center mb-6">
+                <div className="relative w-32 h-32">
+                  <svg className="w-32 h-32 transform -rotate-90" viewBox="0 0 120 120">
+                    <circle
+                      cx="60"
+                      cy="60"
+                      r="50"
+                      stroke="#e5e7eb"
+                      strokeWidth="8"
+                      fill="none"
+                    />
+                    <circle
+                      cx="60"
+                      cy="60"
+                      r="50"
+                      stroke={freedomRatio.isHealthy ? "#10b981" : freedomRatio.percentage > 10 ? "#f59e0b" : "#ef4444"}
+                      strokeWidth="8"
+                      fill="none"
+                      strokeDasharray={`${(freedomRatio.percentage / 100) * 314} 314`}
+                      strokeLinecap="round"
+                      className="transition-all duration-1000 ease-out"
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="text-center">
+                      <div className={`text-2xl font-bold ${freedomRatio.isHealthy ? 'text-green-600' : freedomRatio.percentage > 10 ? 'text-yellow-600' : 'text-red-600'}`}>
+                        {isNaN(freedomRatio.percentage) ? '0' : Math.round(freedomRatio.percentage)}%
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
 
-            <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
-              <div className="text-center">
-                <div className="font-medium text-gray-700">Monthly Income</div>
-                <div className="text-lg font-bold text-blue-600">
-                  {formatCurrency(freedomRatio.monthlyIncome)}
+            {!(freedomRatio.error || freedomRatio.monthlyIncome === 0) && (
+              <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
+                <div className="text-center">
+                  <div className="font-medium text-gray-700">Monthly Income</div>
+                  <div className="text-lg font-bold text-blue-600">
+                    {formatCurrency(isNaN(freedomRatio.monthlyIncome) ? 0 : freedomRatio.monthlyIncome)}
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="font-medium text-gray-700">Freedom Amount</div>
+                  <div className={`text-lg font-bold ${freedomRatio.isHealthy ? 'text-green-600' : 'text-yellow-600'}`}>
+                    {formatCurrency(isNaN(freedomRatio.freedomAmount) ? 0 : freedomRatio.freedomAmount)}
+                  </div>
                 </div>
               </div>
-              <div className="text-center">
-                <div className="font-medium text-gray-700">Freedom Amount</div>
-                <div className={`text-lg font-bold ${freedomRatio.isHealthy ? 'text-green-600' : 'text-yellow-600'}`}>
-                  {formatCurrency(freedomRatio.freedomAmount)}
-                </div>
-              </div>
-            </div>
+            )}
 
             {/* Encouraging Messages */}
             {freedomRatio.isHealthy ? (
@@ -1192,11 +1583,20 @@ const FinancialRealityWizard = ({ onComplete, onBack }) => {
           
           <button
             onClick={nextStep}
-            disabled={!expenses.housing && !expenses.everythingElse && !showDetailedExpenses}
+            disabled={totalExpenses <= 0 || isProcessing}
             className="bg-blue-500 text-white px-8 py-3 rounded-xl font-semibold hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
           >
-            See My Complete Picture
-            <ArrowRight className="w-5 h-5 ml-2 inline" />
+            {isProcessing ? (
+              <>
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white inline mr-2"></div>
+                {loadingMessage || 'Processing...'}
+              </>
+            ) : (
+              <>
+                See My Complete Picture
+                <ArrowRight className="w-5 h-5 ml-2 inline" />
+              </>
+            )}
           </button>
         </div>
       </div>
@@ -1242,9 +1642,23 @@ const FinancialRealityWizard = ({ onComplete, onBack }) => {
                         <div className={`bg-${category.color}-100 p-2 rounded-lg mr-4`}>
                           <Icon className={`w-5 h-5 text-${category.color}-600`} />
                         </div>
-                        <div>
+                        <div className="flex-1">
                           <div className="font-semibold text-gray-800">{debt.name}</div>
                           <div className="text-sm text-gray-600">{category.title}</div>
+                          {(() => {
+                            const monthsToPayoff = debt.currentBalance > 0 && debt.monthlyPayment > 0 ? 
+                              Math.ceil(debt.currentBalance / debt.monthlyPayment) : 0;
+                            const yearsToPayoff = monthsToPayoff > 0 ? Math.round(monthsToPayoff / 12 * 10) / 10 : 0;
+                            
+                            if (yearsToPayoff > 0) {
+                              return (
+                                <div className="text-xs text-green-600 font-medium mt-1">
+                                  ⏰ Disappears in ~{yearsToPayoff} years
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
                         </div>
                       </div>
                       
@@ -1252,8 +1666,11 @@ const FinancialRealityWizard = ({ onComplete, onBack }) => {
                         <div className="font-bold text-lg text-gray-800">
                           {formatCurrency(debt.currentBalance)}
                         </div>
-                        <div className="text-sm text-gray-600">
-                          {formatCurrency(debt.monthlyPayment)}/month
+                        <div className="text-sm text-blue-600 font-medium">
+                          -{formatCurrency(debt.monthlyPayment)}/month
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          (shrinking every month)
                         </div>
                       </div>
                     </div>
@@ -1262,190 +1679,84 @@ const FinancialRealityWizard = ({ onComplete, onBack }) => {
               })}
             </div>
             
-            {/* Totals */}
+            {/* Encouraging Totals with Reframing */}
             <div className="border-t pt-4">
-              <div className="flex justify-between items-center text-lg font-bold">
-                <span>Total Debt:</span>
-                <span>{formatCurrency(debts.reduce((sum, debt) => sum + debt.currentBalance, 0))}</span>
-              </div>
-              <div className="flex justify-between items-center text-lg font-bold text-blue-600">
-                <span>Total Monthly Payments:</span>
-                <span>{formatCurrency(debts.reduce((sum, debt) => sum + debt.monthlyPayment, 0))}</span>
-              </div>
+              {(() => {
+                const totalDebt = debts.reduce((sum, debt) => sum + debt.currentBalance, 0);
+                const totalPayments = debts.reduce((sum, debt) => sum + debt.monthlyPayment, 0);
+                
+                // Calculate estimated payoff time for encouraging messaging
+                const estimatedMonths = totalDebt > 0 && totalPayments > 0 ? 
+                  Math.ceil(totalDebt / totalPayments) : 0;
+                const estimatedYears = Math.round(estimatedMonths / 12 * 10) / 10;
+                
+                return (
+                  <>
+                    <div className="bg-blue-50 rounded-lg p-4 mb-4 border border-blue-200">
+                      <div className="text-center">
+                        <h4 className="font-bold text-blue-800 mb-2">💪 This Isn't a Life Sentence</h4>
+                        <p className="text-blue-700 text-sm leading-relaxed">
+                          What you're looking at isn't permanent debt—it's a <strong>temporary obligation</strong> with a clear end date. 
+                          Every month you pay brings you closer to complete financial freedom.
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center text-lg">
+                        <span className="font-semibold text-gray-700">Temporary obligation:</span>
+                        <div className="text-right">
+                          <span className="font-bold text-gray-800">{formatCurrency(totalDebt)}</span>
+                          {estimatedYears > 0 && (
+                            <div className="text-sm text-green-600 font-medium">
+                              (gone in ~{estimatedYears} years)
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="flex justify-between items-center text-lg">
+                        <span className="font-semibold text-blue-700">Monthly progress toward freedom:</span>
+                        <span className="font-bold text-blue-600">{formatCurrency(totalPayments)}</span>
+                      </div>
+                      
+                      {estimatedYears > 0 && (
+                        <div className="bg-green-50 rounded-lg p-3 border border-green-200 mt-4">
+                          <div className="flex items-center text-green-800">
+                            <span className="text-lg mr-2">🎯</span>
+                            <div>
+                              <div className="font-semibold">This is a solved problem!</div>
+                              <div className="text-sm text-green-700">
+                                You're approximately {estimatedYears} years away from complete debt freedom. 
+                                That's not "forever"—that's a specific, achievable timeline.
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {totalPayments > 0 && (
+                        <div className="bg-purple-50 rounded-lg p-3 border border-purple-200 mt-3">
+                          <div className="text-center">
+                            <div className="font-semibold text-purple-800 mb-1">
+                              🚀 Freedom Preview
+                            </div>
+                            <div className="text-sm text-purple-700">
+                              When this temporary obligation ends, you'll have <strong>{formatCurrency(totalPayments)} extra every month</strong> to 
+                              invest in your dreams. That's <strong>{formatCurrency(totalPayments * 12)} per year</strong> toward your Someday Life!
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </div>
           
-          {/* Impact on Your Someday Life Section */}
-          {debts.length > 0 && (() => {
-            // Get Someday Life data from localStorage
-            const getSomedayLifeData = () => {
-              try {
-                const storedData = localStorage.getItem('somedayLifeData') || localStorage.getItem('financialProfile');
-                if (storedData) {
-                  const data = JSON.parse(storedData);
-                  return data.northStarDream || data.somedayLife || null;
-                }
-              } catch (error) {
-                console.error('Error loading Someday Life data:', error);
-              }
-              return null;
-            };
 
-            const somedayLifeData = getSomedayLifeData();
-            const userAge = financialProfile?.userProfile?.age || 30;
-            
-            // Calculate age-based timeline for each scenario
-            const calculateAgeImpact = (scenario) => {
-              if (scenario.error) return { ageAtFreedom: 'Unknown', ageAtDream: 'Unknown' };
-              
-              const monthsToFreedom = scenario.totalMonths;
-              const yearsToFreedom = monthsToFreedom / 12;
-              const ageAtFreedom = Math.round(userAge + yearsToFreedom);
-              
-              // Estimate additional time to save for dream (assuming dream costs $150k and they save $800/month)
-              const dreamCost = somedayLifeData?.estimatedCost || 150000;
-              const monthlySavings = scenario.monthlyPayment || 800;
-              const monthsToSaveDream = Math.ceil(dreamCost / monthlySavings);
-              const yearsToSaveDream = monthsToSaveDream / 12;
-              const ageAtDream = Math.round(ageAtFreedom + yearsToSaveDream);
-              
-              return { ageAtFreedom, ageAtDream, yearsToFreedom, yearsToSaveDream };
-            };
 
-            return (
-              <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-8 mb-8">
-                <h3 className="text-2xl font-bold text-gray-800 mb-6 text-center">
-                  🎯 Impact on Your Someday Life
-                </h3>
-                
-                <p className="text-center text-gray-700 mb-8">
-                  Your debt strategy doesn't just affect your payments—it determines when you can start living the life you're dreaming of. Here's the timeline for reaching your{' '}
-                  <span className="font-semibold text-purple-600">
-                    {somedayLifeData?.title || somedayLifeData?.location || 'Someday Life'}
-                  </span>:
-                </p>
-
-                <div className="grid lg:grid-cols-3 gap-6">
-                  {/* Current Path Impact */}
-                  {!selectedOptimizationScenario?.current?.error && (() => {
-                    const impact = calculateAgeImpact(selectedOptimizationScenario?.current || { totalMonths: 116, monthlyPayment: 800 });
-                    return (
-                      <div className="bg-white rounded-lg p-6 border border-gray-200">
-                        <div className="text-center">
-                          <div className="bg-gray-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-                            <span className="text-2xl">📅</span>
-                          </div>
-                          <h4 className="font-bold text-gray-800 mb-2">Current Path</h4>
-                          <div className="space-y-2 text-sm">
-                            <div>
-                              <span className="text-gray-600">Debt free at age:</span>
-                              <div className="text-xl font-bold text-gray-800">{impact.ageAtFreedom}</div>
-                            </div>
-                            <div>
-                              <span className="text-gray-600">Reach your dream at age:</span>
-                              <div className="text-xl font-bold text-gray-800">{impact.ageAtDream}</div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })()}
-
-                  {/* Optimized Path Impact */}
-                  {!selectedOptimizationScenario?.optimized?.error && (() => {
-                    const impact = calculateAgeImpact(selectedOptimizationScenario?.optimized || { totalMonths: 100, monthlyPayment: 800 });
-                    const currentImpact = calculateAgeImpact(selectedOptimizationScenario?.current || { totalMonths: 116, monthlyPayment: 800 });
-                    const yearsSaved = currentImpact.ageAtDream - impact.ageAtDream;
-                    
-                    return (
-                      <div className="bg-white rounded-lg p-6 border-2 border-blue-300 relative overflow-hidden">
-                        <div className="absolute top-0 right-0 bg-blue-500 text-white px-3 py-1 text-xs font-bold rounded-bl-lg">
-                          OPTIMIZED
-                        </div>
-                        <div className="text-center">
-                          <div className="bg-blue-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-                            <span className="text-2xl">🎯</span>
-                          </div>
-                          <h4 className="font-bold text-blue-800 mb-2">Optimized Path</h4>
-                          <div className="space-y-2 text-sm">
-                            <div>
-                              <span className="text-gray-600">Debt free at age:</span>
-                              <div className="text-xl font-bold text-blue-600">{impact.ageAtFreedom}</div>
-                            </div>
-                            <div>
-                              <span className="text-gray-600">Reach your dream at age:</span>
-                              <div className="text-xl font-bold text-blue-600">{impact.ageAtDream}</div>
-                            </div>
-                            {yearsSaved > 0 && (
-                              <div className="bg-blue-50 rounded-lg p-2 mt-3">
-                                <div className="text-blue-700 font-semibold">
-                                  {yearsSaved} year{yearsSaved > 1 ? 's' : ''} sooner!
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })()}
-
-                  {/* Accelerated Path Impact */}
-                  {!selectedOptimizationScenario?.accelerated?.error && (() => {
-                    const impact = calculateAgeImpact(selectedOptimizationScenario?.accelerated || { totalMonths: 85, monthlyPayment: 900 });
-                    const currentImpact = calculateAgeImpact(selectedOptimizationScenario?.current || { totalMonths: 116, monthlyPayment: 800 });
-                    const yearsSaved = currentImpact.ageAtDream - impact.ageAtDream;
-                    
-                    return (
-                      <div className="bg-white rounded-lg p-6 border-2 border-green-300 relative overflow-hidden">
-                        <div className="absolute top-0 right-0 bg-green-500 text-white px-3 py-1 text-xs font-bold rounded-bl-lg">
-                          ACCELERATED
-                        </div>
-                        <div className="text-center">
-                          <div className="bg-green-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-                            <span className="text-2xl">🚀</span>
-                          </div>
-                          <h4 className="font-bold text-green-800 mb-2">Accelerated Path</h4>
-                          <div className="space-y-2 text-sm">
-                            <div>
-                              <span className="text-gray-600">Debt free at age:</span>
-                              <div className="text-xl font-bold text-green-600">{impact.ageAtFreedom}</div>
-                            </div>
-                            <div>
-                              <span className="text-gray-600">Reach your dream at age:</span>
-                              <div className="text-xl font-bold text-green-600">{impact.ageAtDream}</div>
-                            </div>
-                            {yearsSaved > 0 && (
-                              <div className="bg-green-50 rounded-lg p-2 mt-3">
-                                <div className="text-green-700 font-semibold">
-                                  {yearsSaved} year{yearsSaved > 1 ? 's' : ''} sooner!
-                                </div>
-                                <div className="text-xs text-green-600">
-                                  Just $100 extra/month
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })()}
-                </div>
-
-                <div className="text-center mt-8 p-6 bg-white rounded-lg border border-purple-200">
-                  <h5 className="font-bold text-purple-800 mb-3">💫 The Power of Strategic Thinking</h5>
-                  <p className="text-gray-700 leading-relaxed">
-                    The difference between your current path and an optimized strategy isn't just money—it's <strong>years of your life</strong>. 
-                    Every month you shave off your debt timeline is a month sooner you can stop working for others and start living for yourself.
-                  </p>
-                  {somedayLifeData?.location && (
-                    <p className="text-purple-600 font-medium mt-2">
-                      Your {somedayLifeData.location} is waiting. The question is: how soon do you want to get there?
-                    </p>
-                  )}
-                </div>
-              </div>
-            );
-          })()}
 
           {/* Debt Optimization Display */}
           {debts.length > 0 && (
@@ -1455,6 +1766,7 @@ const FinancialRealityWizard = ({ onComplete, onBack }) => {
                 title: 'Your Someday Life',
                 estimatedCost: 150000 // Default dream cost estimate
               }}
+              userAge={financialProfile?.userProfile?.age || 30}
               onScenarioSelect={(scenario) => {
                 setSelectedOptimizationScenario(scenario);
                 setShowResults(true);
@@ -1493,7 +1805,18 @@ const FinancialRealityWizard = ({ onComplete, onBack }) => {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 py-8 relative">
+      {/* Loading Overlay */}
+      {isProcessing && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-8 max-w-sm mx-4 text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-500 mx-auto mb-4"></div>
+            <p className="text-lg font-semibold text-gray-800">{loadingMessage}</p>
+            <p className="text-sm text-gray-600 mt-2">This may take a moment...</p>
+          </div>
+        </div>
+      )}
+      
       <div className="max-w-6xl mx-auto px-4">
         {/* Progress Indicator */}
         <div className="mb-8">

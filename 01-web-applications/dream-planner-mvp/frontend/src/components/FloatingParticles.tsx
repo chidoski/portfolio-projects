@@ -6,10 +6,10 @@ export default function FloatingParticles({ count = 8 }: { count?: number }) {
     size: 6 + Math.random() * 3, // 6-9px diameter
     duration: 15 + Math.random() * 10, // 15-25 seconds for smoother movement
     delay: i * 3, // 3 second staggered delays
-    // Alternate between peach and light blue
+    // Alternate between professional teal and coral accent
     color: i % 2 === 0 
-      ? 'linear-gradient(135deg, #fbbf24, #f97316)' // Peach gradient (amber to orange)
-      : 'linear-gradient(135deg, #60a5fa, #3b82f6)', // Light blue gradient
+      ? 'var(--primary-color)' // Professional teal
+      : 'var(--accent-color)', // Coral accent
   }))
 
   return (

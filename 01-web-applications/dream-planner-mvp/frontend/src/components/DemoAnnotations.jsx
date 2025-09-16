@@ -167,13 +167,24 @@ const ANIMATION_VARIANTS = {
 
 // Color schemes for different annotation types
 const TYPE_STYLES = {
-  insight: 'bg-blue-500 border-blue-300 text-white',
-  breakthrough: 'bg-purple-500 border-purple-300 text-white',
-  differentiation: 'bg-green-500 border-green-300 text-white',
-  metrics: 'bg-orange-500 border-orange-300 text-white',
-  economics: 'bg-pink-500 border-pink-300 text-white',
-  opportunity: 'bg-indigo-500 border-indigo-300 text-white',
-  outcome: 'bg-emerald-500 border-emerald-300 text-white'
+  insight: 'border-gray-300 text-white',
+  breakthrough: 'border-gray-300 text-white', 
+  differentiation: 'border-gray-300 text-white',
+  metrics: 'border-gray-300 text-white',
+  economics: 'border-gray-300 text-white',
+  opportunity: 'border-gray-300 text-white',
+  outcome: 'border-gray-300 text-white'
+};
+
+// Background colors using CSS variables
+const TYPE_BACKGROUNDS = {
+  insight: { backgroundColor: 'var(--primary-color)' },
+  breakthrough: { backgroundColor: 'var(--accent-color)' },
+  differentiation: { backgroundColor: 'var(--success-green)' },
+  metrics: { backgroundColor: 'var(--primary-color)' },
+  economics: { backgroundColor: 'var(--accent-color)' },
+  opportunity: { backgroundColor: 'var(--primary-color)' },
+  outcome: { backgroundColor: 'var(--success-green)' }
 };
 
 const DemoAnnotations = ({ 
@@ -302,7 +313,8 @@ const DemoAnnotations = ({
               ${typeStyle}
               transform transition-all duration-300 ease-out
               hover:scale-105 hover:shadow-3xl
-            `}>
+            `}
+            style={TYPE_BACKGROUNDS[annotation.type] || TYPE_BACKGROUNDS.insight}>
               {/* Close Button */}
               <button
                 onClick={() => dismissAnnotation(annotation.id)}
@@ -337,15 +349,16 @@ const DemoAnnotations = ({
 
               {/* Pointer Arrow */}
               <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2">
-                <div className={`w-4 h-4 rotate-45 ${typeStyle.split(' ')[0]} border-r-2 border-b-2 ${typeStyle.split(' ')[1]}`}></div>
+                <div className={`w-4 h-4 rotate-45 border-r-2 border-b-2 border-gray-300`}
+                     style={TYPE_BACKGROUNDS[annotation.type] || TYPE_BACKGROUNDS.insight}></div>
               </div>
             </div>
 
             {/* Subtle Glow Effect */}
             <div className={`
               absolute inset-0 -z-10 rounded-xl blur-xl opacity-30
-              ${typeStyle.split(' ')[0]}
-            `}></div>
+            `}
+            style={TYPE_BACKGROUNDS[annotation.type] || TYPE_BACKGROUNDS.insight}></div>
           </div>
         );
       })}

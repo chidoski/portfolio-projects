@@ -2,10 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { FinancialProfile, FinancialObligations } from '../models/FinancialProfile.js';
 import { TrendingUp, DollarSign, Calendar, Zap, Target, Award, ArrowRight } from 'lucide-react';
 
-const DebtOptimizationDisplay = ({ debts, onScenarioSelect, dreamGoal = null }) => {
+const DebtOptimizationDisplay = ({ debts, onScenarioSelect, dreamGoal = null, userAge = 30 }) => {
   const [scenarios, setScenarios] = useState(null);
   const [animationProgress, setAnimationProgress] = useState(0);
-  const [selectedScenario, setSelectedScenario] = useState(null);
 
   // Calculate all three scenarios
   useEffect(() => {
@@ -506,13 +505,29 @@ const DebtOptimizationDisplay = ({ debts, onScenarioSelect, dreamGoal = null }) 
     return Math.min((months / maxMonths) * 100, 100);
   };
 
-  // Handle scenario selection
-  const handleScenarioSelect = (scenarioKey) => {
-    setSelectedScenario(scenarioKey);
-    if (onScenarioSelect) {
-      onScenarioSelect(scenarios[scenarioKey]);
-    }
+  // Calculate dream achievement timeline
+  const calculateDreamAchievement = (scenario) => {
+    if (scenario.error) return { ageAtFreedom: 'Unknown', ageAtDream: 'Unknown' };
+    
+    const monthsToFreedom = scenario.totalMonths;
+    const yearsToFreedom = monthsToFreedom / 12;
+    const ageAtFreedom = Math.round(userAge + yearsToFreedom);
+    
+    // Estimate additional time to save for dream
+    const dreamCost = dreamGoal?.estimatedCost || 150000;
+    const monthlySavings = scenario.monthlyPayment || 800;
+    const monthsToSaveDream = Math.ceil(dreamCost / monthlySavings);
+    const yearsToSaveDream = monthsToSaveDream / 12;
+    const ageAtDream = Math.round(ageAtFreedom + yearsToSaveDream);
+    
+    return { ageAtFreedom, ageAtDream, yearsToFreedom, yearsToSaveDream };
   };
+
+  // Get dream name
+  const getDreamName = () => {
+    return dreamGoal?.title || dreamGoal?.location || 'Your Someday Life';
+  };
+
 
   if (!scenarios) {
     return (
@@ -533,10 +548,13 @@ const DebtOptimizationDisplay = ({ debts, onScenarioSelect, dreamGoal = null }) 
       {/* Header */}
       <div className="text-center">
         <h3 className="text-2xl font-bold text-gray-800 mb-2">
-          Your Debt Freedom Scenarios
+          Your Paths to Freedom
         </h3>
+        <p className="text-lg text-gray-700 mb-4">
+          How you handle your debt determines when you start living your dreams.
+        </p>
         <p className="text-gray-600">
-          See how different strategies can dramatically change your timeline
+          Here's how different approaches change your timeline to reach <span className="font-semibold text-purple-600">{getDreamName()}</span>:
         </p>
       </div>
 
@@ -544,21 +562,26 @@ const DebtOptimizationDisplay = ({ debts, onScenarioSelect, dreamGoal = null }) 
       <div className="grid lg:grid-cols-3 gap-6">
         {Object.entries(scenarios).map(([key, scenario]) => {
           const Icon = scenario.icon;
-          const isSelected = selectedScenario === key;
+          const dreamAchievement = calculateDreamAchievement(scenario);
           
           return (
             <div
               key={key}
-              onClick={() => handleScenarioSelect(key)}
-              className={`
-                relative bg-white rounded-xl p-6 border-2 cursor-pointer transition-all duration-300 hover:scale-105
-                ${isSelected 
-                  ? `border-${scenario.color}-500 shadow-xl ring-4 ring-${scenario.color}-100` 
-                  : 'border-gray-200 hover:border-gray-300 shadow-lg hover:shadow-xl'
-                }
-              `}
+              className="relative bg-white rounded-xl p-6 border-2 border-gray-200 shadow-lg"
             >
-              {/* Header */}
+              {/* Primary: Dream Achievement Age - The Emotional Payoff */}
+              {!scenario.error && (
+                <div className="text-center mb-6 p-4 bg-gradient-to-br from-purple-50 to-pink-50 rounded-lg">
+                  <div className="text-3xl font-bold text-purple-600 mb-1">
+                    Age {dreamAchievement.ageAtDream}
+                  </div>
+                  <div className="text-sm text-gray-700">
+                    Reach your <span className="font-semibold">{getDreamName()}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Header with Icon and Strategy Name */}
               <div className="flex items-center mb-4">
                 <div className={`bg-${scenario.color}-100 p-3 rounded-full mr-4 ${scenario.error ? 'opacity-50' : ''}`}>
                   <Icon className={`w-6 h-6 text-${scenario.color}-600`} />
@@ -567,9 +590,17 @@ const DebtOptimizationDisplay = ({ debts, onScenarioSelect, dreamGoal = null }) 
                   <h4 className={`text-lg font-bold ${scenario.error ? 'text-gray-600' : 'text-gray-800'}`}>
                     {scenario.title}
                   </h4>
-                  <p className={`text-sm font-medium ${scenario.error ? 'text-gray-500' : `text-${scenario.color}-600`}`}>
-                    {scenario.subtitle}
-                  </p>
+                  {/* Secondary: Debt Freedom Timeline */}
+                  {!scenario.error && (
+                    <p className="text-sm font-medium text-gray-600">
+                      Debt free in {formatDuration(scenario.totalMonths)}
+                    </p>
+                  )}
+                  {scenario.error && (
+                    <p className={`text-sm font-medium ${scenario.error ? 'text-gray-500' : `text-${scenario.color}-600`}`}>
+                      {scenario.subtitle}
+                    </p>
+                  )}
                   {scenario.error && scenario.errorMessage && (
                     <p className="text-xs text-orange-600 mt-1 leading-tight">
                       💡 {scenario.errorMessage}
@@ -578,12 +609,49 @@ const DebtOptimizationDisplay = ({ debts, onScenarioSelect, dreamGoal = null }) 
                 </div>
               </div>
 
+              {/* Financial Mechanics - The Details That Make It Possible */}
+              {!scenario.error && (
+                <div className="space-y-3 mb-4">
+                  {/* Monthly Payment */}
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Monthly Payment:</span>
+                    <span className="font-semibold text-gray-800">{formatCurrency(scenario.monthlyPayment)}</span>
+                  </div>
+                  
+                  {/* Total Interest */}
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Total Interest:</span>
+                    <span className="font-semibold text-gray-800">{formatCurrency(scenario.totalInterest)}</span>
+                  </div>
+                  
+                  {/* Money Saved vs Current Path */}
+                  {key !== 'current' && scenario.interestSaved > 0 && (
+                    <div className="flex justify-between items-center p-2 bg-green-50 rounded">
+                      <span className="text-sm text-green-700">Money Saved vs Current:</span>
+                      <span className="font-bold text-green-600">{formatCurrency(scenario.interestSaved)}</span>
+                    </div>
+                  )}
+                  
+                  {/* Strategy Explanation */}
+                  {key === 'optimized' && (
+                    <div className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                      💡 Strategy: Pay highest interest rate debts first
+                    </div>
+                  )}
+                  {key === 'accelerated' && (
+                    <div className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
+                      💡 Strategy: Pay highest rate first + extra $100/month
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Enhanced Timeline Bar with Dramatic Visual Differences */}
               <div className="mb-6">
                 <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm font-medium text-gray-700">Debt Freedom Timeline</span>
+                  <span className="text-sm font-medium text-gray-700">{getDreamName()} Timeline</span>
                   <span className={`text-sm font-bold ${scenario.error ? 'text-gray-500' : 'text-gray-800'}`}>
-                    {scenario.error ? 'Calculating...' : formatDuration(scenario.totalMonths)}
+                    {scenario.error ? 'Calculating...' : `Age ${dreamAchievement.ageAtDream}`}
                   </span>
                 </div>
                 
@@ -805,12 +873,24 @@ const DebtOptimizationDisplay = ({ debts, onScenarioSelect, dreamGoal = null }) 
                 </div>
               )}
 
-              {/* Selection indicator */}
-              {isSelected && (
-                <div className="absolute top-4 right-4">
-                  <div className={`bg-${scenario.color}-500 text-white rounded-full w-8 h-8 flex items-center justify-center`}>
-                    ✓
-                  </div>
+              {/* Action Button */}
+              {!scenario.error && onScenarioSelect && (
+                <div className="mt-4">
+                  <button
+                    onClick={() => onScenarioSelect(scenario)}
+                    className={`
+                      w-full text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 hover:scale-105 flex items-center justify-center
+                      ${scenario.color === 'gray'
+                        ? 'bg-gray-500 hover:bg-gray-600'
+                        : scenario.color === 'blue'
+                        ? 'bg-blue-500 hover:bg-blue-600'
+                        : 'bg-green-500 hover:bg-green-600'
+                      }
+                    `}
+                  >
+                    Choose {scenario.title}
+                    <ArrowRight className="w-4 h-4 ml-2" />
+                  </button>
                 </div>
               )}
             </div>
@@ -818,102 +898,6 @@ const DebtOptimizationDisplay = ({ debts, onScenarioSelect, dreamGoal = null }) 
         })}
       </div>
 
-      {/* Detailed Comparison */}
-      {selectedScenario && (
-        <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-200">
-          <div className="flex items-center mb-6">
-            <div className={`bg-${scenarios[selectedScenario].color}-100 p-3 rounded-full mr-4`}>
-              {React.createElement(scenarios[selectedScenario].icon, {
-                className: `w-6 h-6 text-${scenarios[selectedScenario].color}-600`
-              })}
-            </div>
-            <div>
-              <h4 className="text-xl font-bold text-gray-800">
-                {scenarios[selectedScenario].title} Details
-              </h4>
-              <p className="text-gray-600">
-                {scenarios[selectedScenario].subtitle}
-              </p>
-            </div>
-          </div>
-
-          {/* Payoff Order (for optimized and accelerated) */}
-          {selectedScenario !== 'current' && scenarios[selectedScenario].payoffOrder && (
-            <div className="mb-6">
-              <h5 className="font-semibold text-gray-800 mb-3">Recommended Payoff Order:</h5>
-              <div className="space-y-2">
-                {scenarios[selectedScenario].payoffOrder.map((item, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center">
-                      <div className={`bg-${scenarios[selectedScenario].color}-100 text-${scenarios[selectedScenario].color}-600 rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold mr-3`}>
-                        {index + 1}
-                      </div>
-                      <span className="font-medium text-gray-800">{item.debtName}</span>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-sm text-gray-600">Month {item.month}</div>
-                      <div className="text-xs text-gray-500">
-                        {formatCurrency(item.originalBalance)}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Individual Debt Timeline (for current path) */}
-          {selectedScenario === 'current' && scenarios.current.individualTimelines && (
-            <div className="mb-6">
-              <h5 className="font-semibold text-gray-800 mb-3">Individual Debt Timelines:</h5>
-              <div className="space-y-3">
-                {scenarios.current.individualTimelines.map((timeline, index) => (
-                  <div key={index} className="p-3 bg-gray-50 rounded-lg">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="font-medium text-gray-800">{timeline.debt.name}</span>
-                      <span className="text-sm font-bold text-gray-600">
-                        {formatDuration(timeline.remainingMonths)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-sm text-gray-600">
-                      <span>Balance: {formatCurrency(timeline.debt.currentBalance)}</span>
-                      <span>Paid off: {formatDate(timeline.payoffDate)}</span>
-                    </div>
-                    {timeline.totalInterest > 0 && (
-                      <div className="text-xs text-orange-600 mt-1">
-                        +{formatCurrency(timeline.totalInterest)} interest
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Action Button */}
-          <div className="flex justify-center">
-            <button
-              onClick={() => {
-                if (onScenarioSelect) {
-                  onScenarioSelect(scenarios[selectedScenario]);
-                }
-              }}
-              className={`
-                bg-gradient-to-r text-white px-8 py-3 rounded-xl font-semibold transition-all duration-300 hover:scale-105 flex items-center
-                ${scenarios[selectedScenario].color === 'gray'
-                  ? 'from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700'
-                  : scenarios[selectedScenario].color === 'blue'
-                  ? 'from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700'
-                  : 'from-green-500 to-green-600 hover:from-green-600 hover:to-green-700'
-                }
-              `}
-            >
-              Choose {scenarios[selectedScenario].title}
-              <ArrowRight className="w-5 h-5 ml-2" />
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Strategy Comparison: Dream Equivalents */}
       {(() => {
@@ -960,6 +944,199 @@ const DebtOptimizationDisplay = ({ debts, onScenarioSelect, dreamGoal = null }) 
                 <strong>Remember:</strong> Every dollar you save in interest is a dollar that goes directly toward building the life you actually want to live.
               </p>
             </div>
+          </div>
+        );
+      })()}
+
+      {/* Debt Freedom Celebration Preview */}
+      {(() => {
+        const bestScenario = scenarios.accelerated?.interestSaved > scenarios.optimized?.interestSaved ? 
+          scenarios.accelerated : scenarios.optimized;
+        
+        if (bestScenario.error || !bestScenario.monthlyPayment) return null;
+        
+        const monthlyFreedMoney = bestScenario.monthlyPayment;
+        const annualFreedMoney = monthlyFreedMoney * 12;
+        
+        // Calculate how much the freed money accelerates dream timeline
+        const dreamCost = dreamGoal?.estimatedCost || 150000;
+        const dreamYearsAccelerated = dreamCost > 0 ? 
+          Math.round((dreamCost / annualFreedMoney) * 10) / 10 : 0;
+        
+        // Calculate specific timeline impact
+        const currentAge = userAge || 30;
+        const debtFreeAge = currentAge + (bestScenario.totalMonths / 12);
+        const yearsToSaveForDream = dreamCost / annualFreedMoney;
+        
+        // With debt: save for dream after debt is paid
+        const dreamAgeWithDebt = debtFreeAge + yearsToSaveForDream;
+        
+        // Without debt: could have been saving during debt payoff period
+        const dreamAgeWithoutDebt = currentAge + yearsToSaveForDream;
+        
+        const yearsAccelerated = dreamAgeWithDebt - dreamAgeWithoutDebt;
+        
+        return (
+          <div className="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl p-8 mb-8 border border-emerald-200">
+            <h4 className="text-2xl font-bold text-gray-800 mb-6 text-center">
+              🎉 Your Debt Freedom Celebration
+            </h4>
+            
+            <p className="text-center text-gray-700 mb-8 text-lg">
+              The month after your last payment with the <span className="font-bold text-emerald-600">{bestScenario.title}</span>:
+            </p>
+            
+            <div className="grid md:grid-cols-2 gap-8 mb-8">
+              {/* Before: Debt Payments */}
+              <div className="bg-white rounded-lg p-6 border border-gray-200 relative">
+                <div className="text-center">
+                  <h5 className="font-bold text-gray-800 mb-4">Before: Monthly Obligations</h5>
+                  <div className="space-y-3">
+                    <div className="bg-red-50 rounded-lg p-4 border border-red-200">
+                      <div className="text-red-600 font-semibold">Debt Payments</div>
+                      <div className="text-2xl font-bold text-red-700">
+                        -{formatCurrency(monthlyFreedMoney)}
+                      </div>
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      Going to banks and lenders
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* After: Freedom Money */}
+              <div className="bg-white rounded-lg p-6 border-2 border-emerald-300 relative overflow-hidden">
+                <div className="absolute top-0 right-0 bg-emerald-500 text-white px-3 py-1 text-xs font-bold rounded-bl-lg">
+                  FREEDOM!
+                </div>
+                <div className="text-center">
+                  <h5 className="font-bold text-emerald-800 mb-4">After: Your Dreams Fund</h5>
+                  <div className="space-y-3">
+                    <div className="bg-emerald-50 rounded-lg p-4 border border-emerald-200">
+                      <div className="text-emerald-600 font-semibold">Available for Dreams</div>
+                      <div className="text-2xl font-bold text-emerald-700">
+                        +{formatCurrency(monthlyFreedMoney)}
+                      </div>
+                    </div>
+                    <div className="text-sm text-emerald-600 font-medium">
+                      {dreamGoal?.title 
+                        ? `Going directly to your ${dreamGoal.title} fund`
+                        : dreamGoal?.location 
+                        ? `Going directly to your ${dreamGoal.location}` 
+                        : 'Going to accelerate your dreams'
+                      }
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Animated Flow Visualization */}
+            <div className="relative mb-8">
+              <div className="flex items-center justify-center">
+                <div className="bg-emerald-100 rounded-full p-4 mr-4">
+                  <span className="text-2xl">💰</span>
+                </div>
+                
+                {/* Animated Arrow */}
+                <div className="flex-1 relative">
+                  <div className="border-t-4 border-emerald-400 border-dashed relative">
+                    <div className="absolute top-0 left-0 w-full h-0 overflow-hidden">
+                      <div className="animate-pulse bg-emerald-400 h-1 w-8 transform -translate-y-0.5" 
+                           style={{
+                             animation: 'flow 2s linear infinite',
+                             animationDelay: '0s'
+                           }}></div>
+                    </div>
+                  </div>
+                  <div className="absolute top-0 right-0 transform -translate-y-2">
+                    <div className="text-emerald-500 text-xl">→</div>
+                  </div>
+                </div>
+                
+                <div className="bg-purple-100 rounded-full p-4 ml-4">
+                  <span className="text-2xl">{dreamGoal?.title?.toLowerCase().includes('cottage') ? '🏡' : '🎯'}</span>
+                </div>
+              </div>
+              
+              <div className="text-center mt-4">
+                <div className="text-emerald-600 font-bold text-lg">
+                  The month after your last payment: {formatCurrency(monthlyFreedMoney)} extra every month
+                </div>
+                <div className="text-emerald-500 text-sm mb-2">
+                  That's {formatCurrency(annualFreedMoney)} annually
+                </div>
+                <div className="text-purple-600 font-semibold text-sm">
+                  {dreamGoal?.title || dreamGoal?.location 
+                    ? `Bringing your ${getDreamName()} ${Math.round(yearsAccelerated)} years closer`
+                    : `Accelerating your dreams by ${Math.round(yearsAccelerated)} years`
+                  }
+                </div>
+              </div>
+            </div>
+            
+            {/* Visual Timeline Comparison */}
+            <div className="bg-white rounded-lg p-6 border border-emerald-200">
+              <div className="text-center">
+                <h5 className="font-bold text-emerald-800 mb-6">
+                  🚀 Your Dream Timeline Comparison
+                </h5>
+                
+                {/* Two-path visualization */}
+                <div className="space-y-4 mb-6">
+                  {/* Path 1: With Debt Payments */}
+                  <div className="bg-red-50 rounded-lg p-4 border border-red-200">
+                    <div className="flex items-center justify-between">
+                      <div className="text-left">
+                        <div className="text-red-700 font-semibold text-sm">With debt payments:</div>
+                        <div className="text-red-600 text-xs">Money tied up in debt servicing</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-2xl font-bold text-red-700">Age {Math.round(dreamAgeWithDebt)}</div>
+                        <div className="text-xs text-red-600">{getDreamName()} achievable</div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Path 2: After Debt Freedom */}
+                  <div className="bg-emerald-50 rounded-lg p-4 border border-emerald-200">
+                    <div className="flex items-center justify-between">
+                      <div className="text-left">
+                        <div className="text-emerald-700 font-semibold text-sm">After debt freedom:</div>
+                        <div className="text-emerald-600 text-xs">Full {formatCurrency(monthlyFreedMoney)}/month toward dreams</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-2xl font-bold text-emerald-700">Age {Math.round(dreamAgeWithoutDebt)}</div>
+                        <div className="text-xs text-emerald-600">{getDreamName()} achievable</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Impact Summary */}
+                <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-4 border border-purple-200">
+                  <div className="text-center">
+                    <div className="text-purple-700 font-bold text-lg mb-1">
+                      {Math.round(yearsAccelerated)} Years Accelerated
+                    </div>
+                    <div className="text-purple-600 text-sm">
+                      From paying off debt and redirecting {formatCurrency(monthlyFreedMoney)}/month to your {getDreamName()}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* CSS for animation */}
+            <style jsx>{`
+              @keyframes flow {
+                0% { transform: translateX(-100px) translateY(-2px); opacity: 0; }
+                20% { opacity: 1; }
+                80% { opacity: 1; }
+                100% { transform: translateX(calc(100vw - 200px)) translateY(-2px); opacity: 0; }
+              }
+            `}</style>
           </div>
         );
       })()}

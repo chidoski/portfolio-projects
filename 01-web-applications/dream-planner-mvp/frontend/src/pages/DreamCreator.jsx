@@ -4,7 +4,8 @@ import { format, addDays } from 'date-fns'
 import ProgressBar from '../components/ProgressBar'
 import SavingsBreakdown from '../components/SavingsBreakdown'
 import { calculateSavingsStrategies, convertToLifeEquivalents, calculateMilestones } from '../services/dreamCalculations'
-import { saveDreamDraft, loadDreamDraft, clearDreamDraft, saveDream } from '../services/localStorage'
+import { saveDreamDraft, loadDreamDraft, clearDreamDraft } from '../services/localStorage'
+import { DreamService } from '../services/dreamService'
 
 const CATEGORIES = [
   { value: 'travel', label: 'Travel & Adventures', icon: Plane, color: 'blue', description: 'Vacations, trips, experiences' },
@@ -279,19 +280,15 @@ export default function DreamCreator({ onComplete, onBack }) {
         selectedStrategy: selectedStrategy
       }
       
-      const result = saveDream(dreamData)
+      const updatedDreams = DreamService.saveDream(dreamData)
+      const savedDream = updatedDreams[updatedDreams.length - 1] // Get the newly added dream
       
-      if (result.success) {
-        setCreatedDream(result.dream)
-        setStep(5)
-        
-        setTimeout(() => {
-          onComplete(result.dreamId)
-        }, 2000)
-      } else {
-        setError(result.error || 'Failed to save dream. Please try again.')
-        console.error('Dream save error:', result)
-      }
+      setCreatedDream(savedDream)
+      setStep(5)
+      
+      setTimeout(() => {
+        onComplete(savedDream.id)
+      }, 2000)
     } catch (err) {
       setError('Failed to create dream. Please try again.')
       console.error('Dream creation error:', err)

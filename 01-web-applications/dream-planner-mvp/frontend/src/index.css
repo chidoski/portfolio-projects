@@ -5,13 +5,18 @@
 /* stylelint-enable at-rule-no-unknown */
 
 :root {
-  --primary-coral: #FF6B8A;
-  --gradient-start: #FF6B8A;
-  --gradient-end: #C77DFF;
+  --primary-color: #0B7A75;
+  --secondary-color: #F7F9FA;
+  --accent-color: #FF6B6B;
   --success-green: #10B981;
-  --text-primary: #1F2937;
-  --text-secondary: #6B7280;
+  --text-primary: #2D3748;
+  --text-secondary: #718096;
   --background: #FAFBFC;
+  
+  /* Legacy support - gradually remove these */
+  --primary-coral: #FF6B6B;
+  --gradient-start: #0B7A75;
+  --gradient-end: #0B7A75;
 }
 
 @layer base {
@@ -48,11 +53,11 @@
   
   .btn-primary {
     @apply btn text-white shadow-lg hover:shadow-xl;
-    background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
+    background: var(--primary-color);
   }
   
   .btn-primary:hover {
-    background: linear-gradient(to right, #FF5A7A, #B865FF);
+    background: #0A6B66;
   }
   
   .btn-primary:active {
@@ -103,7 +108,7 @@
   
   .progress-fill {
     @apply h-full rounded-full relative;
-    background: linear-gradient(to right, var(--success-green), var(--primary-coral));
+    background: linear-gradient(to right, var(--success-green), var(--primary-color));
     transition: width 1000ms cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
   }
@@ -136,18 +141,18 @@
 
   .celebration-card {
     @apply text-white rounded-xl p-6 shadow-lg animate-fade-in;
-    background: linear-gradient(to right, var(--success-green), var(--primary-coral));
+    background: linear-gradient(to right, var(--success-green), var(--primary-color));
   }
 
   /* Animated Mesh Gradient Background */
   .mesh-gradient-bg {
     background: linear-gradient(
       -45deg, 
-      #FFB5A7 0%, 
-      #FCD5CE 25%, 
-      #F8AD9D 50%, 
-      #C77DFF 75%, 
-      #FFE5B4 100%
+      var(--secondary-color) 0%, 
+      #E8F4F8 25%, 
+      #D1E9F0 50%, 
+      var(--primary-color) 75%, 
+      var(--secondary-color) 100%
     );
     background-size: 400% 400%;
     animation: meshGradient 20s ease-in-out infinite;
@@ -156,12 +161,12 @@
   .mesh-gradient-subtle {
     background: linear-gradient(
       135deg,
-      #FFE5B4 0%,
-      #FFCDB2 20%,
-      #FFB3C6 40%,
-      #C77DFF 60%,
-      #FCD5CE 80%,
-      #F8AD9D 100%
+      var(--secondary-color) 0%,
+      #F0F8FA 20%,
+      #E8F4F8 40%,
+      var(--primary-color) 60%,
+      #D1E9F0 80%,
+      var(--secondary-color) 100%
     );
     background-size: 300% 300%;
     animation: meshGradient 20s ease-in-out infinite;
@@ -298,11 +303,11 @@
   @keyframes pulse-glow {
     0%, 100% { 
       transform: scale(1);
-      box-shadow: 0 0 20px rgba(168, 85, 247, 0.4);
+      box-shadow: 0 0 20px rgba(11, 122, 117, 0.4);
     }
     50% { 
       transform: scale(1.05);
-      box-shadow: 0 0 30px rgba(168, 85, 247, 0.6);
+      box-shadow: 0 0 30px rgba(11, 122, 117, 0.6);
     }
   }
 
@@ -411,12 +416,12 @@
   
   .hover-glow:hover {
     transform: scale(1.02);
-    box-shadow: 0 0 20px rgba(255, 107, 138, 0.3);
+    box-shadow: 0 0 20px rgba(11, 122, 117, 0.3);
   }
   
   .hover-glow:active {
     transform: scale(0.98);
     filter: brightness(0.9);
-    box-shadow: 0 0 15px rgba(255, 107, 138, 0.2);
+    box-shadow: 0 0 15px rgba(11, 122, 117, 0.2);
   }
 }

@@ -24,7 +24,7 @@ import {
 import { format, startOfWeek, endOfWeek, eachDayOfInterval, subDays, addDays, isSameDay } from 'date-fns'
 import { getDailyMessage, getCelebrationMessage } from '../services/behavioralNudges'
 import { getProgressHistory, calculateStreak } from '../services/progressTracking'
-import { loadDreams } from '../services/localStorage'
+import { DreamService } from '../services/dreamService'
 
 /**
  * WeeklyReview Component
@@ -50,7 +50,7 @@ export default function WeeklyReview({ currentDream, financialProfile, onClose }
   // Generate weekly data
   useEffect(() => {
     const generateWeeklyData = () => {
-      const dreams = loadDreams()
+      const dreams = DreamService.getUniqueDreams()
       const primaryDream = currentDream || dreams[0] || {
         title: "Cottage by the Lake",
         target_amount: 85000,

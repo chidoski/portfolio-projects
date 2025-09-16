@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react'
 import { format } from 'date-fns'
-import { Sparkles, Plus, Target, Calendar, DollarSign, TrendingUp, Calculator } from 'lucide-react'
+import { Sparkles, Plus, Target, Calendar, DollarSign, TrendingUp, Calculator, Zap, ArrowRight, Clock, Trash2 } from 'lucide-react'
 import ProgressBar from '../components/ProgressBar'
-// @ts-ignore - localStorage.js doesn't have TypeScript declarations
-import { loadDreams, updateDream, deleteDream } from '../services/localStorage'
+import SomedayLifeHero from '../components/SomedayLifeHero'
+import LifeMilestonesTimeline from '../components/LifeMilestonesTimeline'
+import LifeJourneyTimeline from '../components/LifeJourneyTimeline'
+import { DreamService } from '../services/dreamService'
 
 /**
  * Dashboard Component
  * Main dashboard for managing and viewing all user dreams
  */
-const Dashboard = ({ onAddDream, highlightedDreamId, onNavigateToZeroBasedPlanner }) => {
+const Dashboard = ({ onAddDream, highlightedDreamId, onNavigateToZeroBasedPlanner, onNavigateToIncomeAccelerator }) => {
   const [dreams, setDreams] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedDream, setSelectedDream] = useState(null)
@@ -18,12 +20,27 @@ const Dashboard = ({ onAddDream, highlightedDreamId, onNavigateToZeroBasedPlanne
   useEffect(() => {
     const loadUserDreams = () => {
       try {
-        const savedDreams = loadDreams()
-        setDreams(savedDreams)
+        // Debug console logging for localStorage investigation
+        console.log('All localStorage keys:', Object.keys(localStorage))
+        console.log('Dreams in storage:', localStorage.getItem('dreams'))
+        console.log('Current dream:', localStorage.getItem('currentDream'))
+        console.log('Dream list:', localStorage.getItem('dreamsList'))
+        
+        const savedDreams = DreamService.getAllDreams()
+        const uniqueDreams = DreamService.getUniqueDreams()
+        
+        // Log deduplication results for debugging
+        if (savedDreams.length !== uniqueDreams.length) {
+          console.log(`Removed ${savedDreams.length - uniqueDreams.length} duplicate dreams`)
+          console.log('Original dreams count:', savedDreams.length)
+          console.log('Unique dreams count:', uniqueDreams.length)
+        }
+        
+        setDreams(uniqueDreams)
         
         // If there's a highlighted dream ID, find and select it
         if (highlightedDreamId) {
-          const highlightedDream = savedDreams.find(dream => dream.id === highlightedDreamId)
+          const highlightedDream = uniqueDreams.find(dream => dream.id === highlightedDreamId)
           if (highlightedDream) {
             setSelectedDream(highlightedDream)
           }
@@ -79,6 +96,20 @@ const Dashboard = ({ onAddDream, highlightedDreamId, onNavigateToZeroBasedPlanne
   }, { totalAmount: 0, totalProgress: 0 })
 
   const averageProgress = dreams.length > 0 ? totalStats.totalProgress / dreams.length : 0
+
+  // Delete dream handler
+  const handleDeleteDream = (dreamId) => {
+    if (!confirm('Are you sure you want to remove this dream?')) return
+    
+    try {
+      const updatedDreams = DreamService.deleteDream(dreamId)
+      const uniqueDreams = DreamService.getUniqueDreams()
+      setDreams(uniqueDreams) // Update local state to trigger re-render
+    } catch (error) {
+      console.error('Error deleting dream:', error)
+      alert('An error occurred while deleting the dream.')
+    }
+  }
 
   if (loading) {
     return (
@@ -139,6 +170,36 @@ const Dashboard = ({ onAddDream, highlightedDreamId, onNavigateToZeroBasedPlanne
           </div>
         ) : (
           <>
+            {/* Your Someday Life Hero Section */}
+            <div className="mb-12">
+              <SomedayLifeHero 
+                userAge={28}
+                targetAge={52}
+                propertyTarget={450000}
+                livingExpensesPerYear={40000}
+                yearsOfExpenses={25}
+                currentPropertySaved={45000}
+                currentExpensesSaved={120000}
+              />
+            </div>
+
+            {/* Life Milestones Along the Way */}
+            <div className="mb-12">
+              <LifeMilestonesTimeline 
+                dreams={dreams}
+                somedayLifeAge={52}
+              />
+            </div>
+
+            {/* Complete Life Journey Timeline */}
+            <div className="mb-12">
+              <LifeJourneyTimeline 
+                dreams={dreams}
+                userAge={28}
+                somedayLifeAge={52}
+              />
+            </div>
+
             {/* Statistics Overview */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
               <div className="bg-white rounded-lg p-6 shadow-sm">
@@ -193,19 +254,23 @@ const Dashboard = ({ onAddDream, highlightedDreamId, onNavigateToZeroBasedPlanne
             </div>
 
             {/* Dreams Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
               {dreams.map((dream) => (
                 <DreamCard
                   key={dream.id}
                   dream={dream}
                   isHighlighted={dream.id === highlightedDreamId}
                   onSelect={() => setSelectedDream(dream)}
+                  onDelete={() => handleDeleteDream(dream.id)}
                   formatCurrency={formatCurrency}
                   getDaysRemaining={getDaysRemaining}
                   getCategoryColor={getCategoryColor}
                 />
               ))}
             </div>
+
+            {/* Boost Your Timeline Section */}
+            <BoostTimelineSection onNavigateToIncomeAccelerator={onNavigateToIncomeAccelerator} />
           </>
         )}
 
@@ -227,7 +292,7 @@ const Dashboard = ({ onAddDream, highlightedDreamId, onNavigateToZeroBasedPlanne
 /**
  * Individual Dream Card Component
  */
-const DreamCard = ({ dream, isHighlighted, onSelect, formatCurrency, getDaysRemaining, getCategoryColor }) => {
+const DreamCard = ({ dream, isHighlighted, onSelect, onDelete, formatCurrency, getDaysRemaining, getCategoryColor }) => {
   const categoryColor = getCategoryColor(dream.category)
   const daysRemaining = getDaysRemaining(dream.target_date)
   const progress = dream.progress || 0
@@ -248,9 +313,21 @@ const DreamCard = ({ dream, isHighlighted, onSelect, formatCurrency, getDaysRema
               {dream.category.charAt(0).toUpperCase() + dream.category.slice(1)}
             </span>
           </div>
-          <div className="text-right">
-            <p className="text-sm text-gray-500">Target</p>
-            <p className="font-bold text-gray-900">{formatCurrency(dream.target_amount)}</p>
+          <div className="text-right flex flex-col items-end">
+            <button
+              onClick={(e) => {
+                e.stopPropagation() // Prevent card selection when clicking delete
+                onDelete()
+              }}
+              className="mb-2 p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors duration-200"
+              title="Delete dream"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+            <div>
+              <p className="text-sm text-gray-500">Target</p>
+              <p className="font-bold text-gray-900">{formatCurrency(dream.target_amount)}</p>
+            </div>
           </div>
         </div>
 
@@ -371,6 +448,81 @@ const DreamDetailModal = ({ dream, onClose, formatCurrency, getDaysRemaining, ge
               Edit Dream
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Boost Your Timeline Section Component
+ */
+const BoostTimelineSection = ({ onNavigateToIncomeAccelerator }) => {
+  return (
+    <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-2xl p-8 border border-purple-100">
+      <div className="max-w-4xl mx-auto">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <div className="flex justify-center mb-4">
+            <div className="bg-gradient-to-r from-purple-500 to-blue-500 p-4 rounded-full">
+              <Zap className="w-8 h-8 text-white" />
+            </div>
+          </div>
+          <h2 className="text-3xl font-bold text-gray-900 mb-4">
+            Boost Your Timeline
+          </h2>
+          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            Want to achieve your dreams faster? Explore strategies to increase your income and accelerate your progress.
+          </p>
+        </div>
+
+        {/* Benefits Grid */}
+        <div className="grid md:grid-cols-3 gap-6 mb-8">
+          <div className="bg-white rounded-xl p-6 shadow-sm">
+            <div className="bg-green-100 p-3 rounded-full w-12 h-12 flex items-center justify-center mb-4">
+              <TrendingUp className="w-6 h-6 text-green-600" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Income Strategies</h3>
+            <p className="text-gray-600 text-sm">
+              Discover proven methods to increase your earning potential and create additional income streams.
+            </p>
+          </div>
+
+          <div className="bg-white rounded-xl p-6 shadow-sm">
+            <div className="bg-blue-100 p-3 rounded-full w-12 h-12 flex items-center justify-center mb-4">
+              <Clock className="w-6 h-6 text-blue-600" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Faster Timeline</h3>
+            <p className="text-gray-600 text-sm">
+              Cut years off your dream timeline by optimizing your income and savings rate.
+            </p>
+          </div>
+
+          <div className="bg-white rounded-xl p-6 shadow-sm">
+            <div className="bg-purple-100 p-3 rounded-full w-12 h-12 flex items-center justify-center mb-4">
+              <Target className="w-6 h-6 text-purple-600" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Bigger Dreams</h3>
+            <p className="text-gray-600 text-sm">
+              Higher income means you can pursue bigger dreams or achieve multiple goals simultaneously.
+            </p>
+          </div>
+        </div>
+
+        {/* Call to Action */}
+        <div className="text-center">
+          <button
+            onClick={onNavigateToIncomeAccelerator}
+            className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold rounded-xl hover:from-purple-700 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
+          >
+            <Zap className="w-5 h-5 mr-2" />
+            Explore Income Accelerator
+            <ArrowRight className="w-5 h-5 ml-2" />
+          </button>
+          
+          <p className="text-sm text-gray-500 mt-3">
+            Free strategies and tools to boost your earning potential
+          </p>
         </div>
       </div>
     </div>

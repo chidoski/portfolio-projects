@@ -111,7 +111,8 @@ export default function QuickStart({ onSelectTemplate, onBack }) {
                 onClick={() => {
                   // Navigate with URL parameters for template data
                   const templateParams = new URLSearchParams({
-                    template: encodeURIComponent(JSON.stringify(template))
+                    template: encodeURIComponent(JSON.stringify(template)),
+                    step: '2' // Start at Step 2 in SomedayLifeBuilder
                   })
                   
                   // Also support individual parameters for easier URL manipulation
@@ -127,11 +128,11 @@ export default function QuickStart({ onSelectTemplate, onBack }) {
                     templateParams.set('imageUrl', encodeURIComponent(template.imageUrl))
                   }
                   
-                  // Navigate to dream creator with template data
+                  // Navigate to someday builder with template data
                   window.history.pushState(
                     { templateData: template }, 
                     '', 
-                    `/dream-creator?${templateParams.toString()}`
+                    `/someday-builder?${templateParams.toString()}`
                   )
                   
                   // Call the callback to handle the navigation
@@ -248,13 +249,13 @@ export default function QuickStart({ onSelectTemplate, onBack }) {
           </p>
           <button
             onClick={() => {
-              // Navigate to dream creator without template data
-              window.history.pushState({}, '', '/dream-creator')
+              // Navigate to someday builder without template data
+              window.history.pushState({}, '', '/someday-builder')
               onSelectTemplate(null)
             }}
             className="btn-secondary px-6 py-3"
           >
-            Create Custom Dream
+            Build Custom Someday Life
           </button>
         </div>
       </div>

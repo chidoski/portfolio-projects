@@ -283,7 +283,9 @@ const ThreeBucketDisplay = ({
       lightColor: 'bg-blue-100',
       textColor: 'text-blue-700',
       icon: '🏛️',
-      target: 'Safe Retirement'
+      target: 'Safe Retirement',
+      colorStyle: { backgroundColor: 'var(--primary-color)' },
+      lightColorStyle: { backgroundColor: 'var(--secondary-color)' }
     },
     dream: {
       name: 'Dream',
@@ -292,7 +294,9 @@ const ThreeBucketDisplay = ({
       lightColor: 'bg-purple-100',
       textColor: 'text-purple-700',
       icon: '✨',
-      target: 'Someday Life'
+      target: 'Someday Life',
+      colorStyle: { backgroundColor: 'var(--accent-color)' },
+      lightColorStyle: { backgroundColor: 'var(--secondary-color)' }
     },
     life: {
       name: 'Life',
@@ -301,7 +305,9 @@ const ThreeBucketDisplay = ({
       lightColor: 'bg-green-100',
       textColor: 'text-green-700',
       icon: '🎯',
-      target: 'Near-term Goals'
+      target: 'Near-term Goals',
+      colorStyle: { backgroundColor: 'var(--success-green)' },
+      lightColorStyle: { backgroundColor: 'var(--secondary-color)' }
     }
   };
 
@@ -363,12 +369,16 @@ const ThreeBucketDisplay = ({
 
               {/* Progress Bar */}
               <div className="relative">
-                <div className={`h-6 ${config.lightColor} rounded-full overflow-hidden`}>
+                <div className={`h-6 rounded-full overflow-hidden`}
+                     style={config.lightColorStyle}>
                   <div
-                    className={`h-full ${config.color} transition-all duration-500 ease-out ${
+                    className={`h-full transition-all duration-500 ease-out ${
                       isAnimating ? 'animate-pulse' : ''
                     }`}
-                    style={{ width: `${Math.min(100, progress)}%` }}
+                    style={{ 
+                      width: `${Math.min(100, progress)}%`, 
+                      ...config.colorStyle
+                    }}
                   />
                   {progress > 100 && (
                     <div
@@ -407,11 +417,11 @@ const ThreeBucketDisplay = ({
                     className={`w-full h-2 rounded-lg appearance-none cursor-pointer slider-${bucketKey}`}
                     style={{
                       background: `linear-gradient(to right, ${
-                        bucketKey === 'foundation' ? '#3B82F6' : 
-                        bucketKey === 'dream' ? '#8B5CF6' : '#10B981'
+                        bucketKey === 'foundation' ? 'var(--primary-color)' : 
+                        bucketKey === 'dream' ? 'var(--accent-color)' : 'var(--success-green)'
                       } 0%, ${
-                        bucketKey === 'foundation' ? '#3B82F6' : 
-                        bucketKey === 'dream' ? '#8B5CF6' : '#10B981'
+                        bucketKey === 'foundation' ? 'var(--primary-color)' : 
+                        bucketKey === 'dream' ? 'var(--accent-color)' : 'var(--success-green)'
                       } ${allocation}%, #E5E7EB ${allocation}%, #E5E7EB 100%)`
                     }}
                   />
@@ -423,7 +433,8 @@ const ThreeBucketDisplay = ({
               </div>
 
               {/* Timeline Impact */}
-              <div className={`p-4 ${config.lightColor} rounded-lg`}>
+              <div className={`p-4 rounded-lg`}
+                   style={config.lightColorStyle}>
                 <div className="flex justify-between items-center">
                   <span className={`text-sm font-medium ${config.textColor}`}>
                     {config.target} Timeline:
@@ -515,7 +526,7 @@ const ThreeBucketDisplay = ({
           height: 20px;
           width: 20px;
           border-radius: 50%;
-          background: #3B82F6;
+          background: var(--primary-color);
           cursor: pointer;
           border: 2px solid white;
           box-shadow: 0 2px 4px rgba(0,0,0,0.2);
@@ -526,7 +537,7 @@ const ThreeBucketDisplay = ({
           height: 20px;
           width: 20px;
           border-radius: 50%;
-          background: #8B5CF6;
+          background: var(--accent-color);
           cursor: pointer;
           border: 2px solid white;
           box-shadow: 0 2px 4px rgba(0,0,0,0.2);
@@ -537,7 +548,7 @@ const ThreeBucketDisplay = ({
           height: 20px;
           width: 20px;
           border-radius: 50%;
-          background: #10B981;
+          background: var(--success-green);
           cursor: pointer;
           border: 2px solid white;
           box-shadow: 0 2px 4px rgba(0,0,0,0.2);

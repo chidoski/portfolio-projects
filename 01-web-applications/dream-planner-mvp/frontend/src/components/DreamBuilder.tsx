@@ -8,7 +8,8 @@ import SavingsBreakdown from './SavingsBreakdown'
 // @ts-ignore - dreamCalculations.js doesn't have TypeScript declarations
 import { calculateSavingsStrategies, convertToLifeEquivalents, calculateMilestones } from '../services/dreamCalculations'
 // @ts-ignore - localStorage.js doesn't have TypeScript declarations
-import { saveDreamDraft, loadDreamDraft, clearDreamDraft, saveDream } from '../services/localStorage'
+import { saveDreamDraft, loadDreamDraft, clearDreamDraft } from '../services/localStorage'
+import { DreamService } from '../services/dreamService'
 
 interface TemplateData {
   title: string
@@ -250,20 +251,16 @@ export default function DreamBuilder({ onComplete, selectedTemplate }: DreamBuil
         selectedStrategy: selectedStrategy
       }
       
-      const result = saveDream(dreamData)
+      const updatedDreams = DreamService.saveDream(dreamData)
+      const savedDream = updatedDreams[updatedDreams.length - 1] // Get the newly added dream
       
-      if (result.success) {
-        setCreatedDream(result.dream)
-        setStep(5) // Success step
-        
-        // Navigate to dashboard with dream ID after a short delay
-        setTimeout(() => {
-          onComplete(result.dreamId)
-        }, 2000)
-      } else {
-        setError(result.error || 'Failed to save dream. Please try again.')
-        console.error('Dream save error:', result)
-      }
+      setCreatedDream(savedDream)
+      setStep(5) // Success step
+      
+      // Navigate to dashboard with dream ID after a short delay
+      setTimeout(() => {
+        onComplete(savedDream.id)
+      }, 2000)
     } catch (err) {
       setError('Failed to create dream. Please try again.')
       console.error('Dream creation error:', err)
